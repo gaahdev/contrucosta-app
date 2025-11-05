@@ -9,7 +9,11 @@ class CommissionTrackerAPITester:
         self.api_url = f"{base_url}/api"
         self.admin_token = None
         self.user_token = None
+        self.helper_token = None
         self.test_user_id = None
+        self.test_helper_id = None
+        self.assigned_driver_token = None
+        self.assigned_driver_id = None
         self.tests_run = 0
         self.tests_passed = 0
         
@@ -22,6 +26,20 @@ class CommissionTrackerAPITester:
             "GSD": 7.50,
             "AUA": 10.00
         }
+        
+        # Day assignments for drivers
+        self.day_assignments = {
+            "Davi": "Monday",
+            "Ivaney": "Tuesday", 
+            "Claudio": "Wednesday",
+            "Valdiney": "Thursday"
+        }
+        
+        # Expected checklist categories
+        self.expected_categories = [
+            "Motor", "Freio", "Direção", "Elétrico", 
+            "Pneus", "Placas", "Obrigatório", "Habitáculo"
+        ]
 
     def run_test(self, name, method, endpoint, expected_status, data=None, headers=None):
         """Run a single API test"""
