@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
@@ -37,6 +37,75 @@ TRUCK_RATES = {
     "AUA": 10.00
 }
 
+# Day assignments for drivers
+DAY_ASSIGNMENTS = {
+    "Davi": "Monday",
+    "Ivaney": "Tuesday",
+    "Claudio": "Wednesday",
+    "Valdiney": "Thursday"
+}
+
+# Checklist items in Portuguese by category
+CHECKLIST_ITEMS = {
+    "Motor": [
+        "verificar óleo do motor",
+        "nível do radiador",
+        "se há vazamento no motor",
+        "drenar o filtro racor"
+    ],
+    "Freio": [
+        "verificar pressão do ar",
+        "altura do pedal",
+        "drenar o balão de ar"
+    ],
+    "Direção": [
+        "verificar óleo da direção",
+        "diro da direção",
+        "se há barulho na direção",
+        "barra de direção",
+        "as molas"
+    ],
+    "Elétrico": [
+        "verificar buzina",
+        "setas",
+        "sirene de ré",
+        "faróis",
+        "luz de ré",
+        "luz de freio",
+        "limpadores",
+        "instrumentos no painel",
+        "iluminação de placa"
+    ],
+    "Pneus": [
+        "verificar pressão dos pneus",
+        "desgastes dos pneus",
+        "o estepe"
+    ],
+    "Placas": [
+        "verificar condições das placas",
+        "tarjetas",
+        "lacre da placa"
+    ],
+    "Obrigatório": [
+        "verificar validade do extintor",
+        "verificar chave de roda",
+        "macaco",
+        "triângulo",
+        "documentos"
+    ],
+    "Habitáculo": [
+        "verificar bancos",
+        "cintos de segurança",
+        "vidro das portas",
+        "para-brisa",
+        "espelhos retrovisores",
+        "portas-luvas",
+        "fechaduras",
+        "limpeza interna",
+        "limpeza externa"
+    ]
+}
+
 # Create the main app
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -58,6 +127,7 @@ class User(BaseModel):
     username: str
     name: str
     role: str
+    assigned_day: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class DeliveryRecord(BaseModel):
@@ -73,11 +143,26 @@ class DeliveryUpdate(BaseModel):
     truck_type: str
     delivery_count: int
 
+class ChecklistSubmission(BaseModel):
+    items: Dict[str, Dict[str, str]]  # category -> item -> response
+
+class ChecklistRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    user_name: str
+    week_start: str  # ISO date string for the Monday of the week
+    completed: bool = False
+    items: Dict[str, Dict[str, str]] = {}
+    submitted_at: Optional[datetime] = None
+
 class UserDashboard(BaseModel):
     user: User
     deliveries: dict
     total_deliveries: int
     total_commission: float
+    checklist_completed: bool
+    current_week_start: str
 
 class AdminUserSummary(BaseModel):
     user: User
@@ -126,6 +211,19 @@ async def get_admin_user(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
+def get_week_start(date: datetime = None) -> str:
+    """Get the Monday of the current week in ISO format"""
+    if date is None:
+        date = datetime.now(timezone.utc)
+    # Get the Monday of the week
+    days_since_monday = date.weekday()
+    monday = date - timedelta(days=days_since_monday)
+    return monday.date().isoformat()
+
+def get_assigned_day(name: str) -> Optional[str]:
+    """Get assigned day for driver based on name"""
+    return DAY_ASSIGNMENTS.get(name)
+
 # Calculate commission for a user
 async def calculate_user_commission(user_id: str) -> dict:
     deliveries = await db.deliveries.find({"user_id": user_id}, {"_id": 0}).to_list(100)
@@ -147,6 +245,15 @@ async def calculate_user_commission(user_id: str) -> dict:
         "total_commission": round(total_commission, 2)
     }
 
+async def check_checklist_completed(user_id: str, week_start: str) -> bool:
+    """Check if user has completed checklist for the current week"""
+    checklist = await db.checklists.find_one({
+        "user_id": user_id,
+        "week_start": week_start,
+        "completed": True
+    })
+    return checklist is not None
+
 # Routes
 @api_router.post("/auth/register")
 async def register(user_data: UserRegister):
@@ -159,11 +266,17 @@ async def register(user_data: UserRegister):
     if user_data.role not in ["driver", "helper"]:
         raise HTTPException(status_code=400, detail="Role must be 'driver' or 'helper'")
     
+    # Get assigned day for driver
+    assigned_day = None
+    if user_data.role == "driver":
+        assigned_day = get_assigned_day(user_data.name)
+    
     # Create user
     user = User(
         username=user_data.username,
         name=user_data.name,
-        role=user_data.role
+        role=user_data.role,
+        assigned_day=assigned_day
     )
     
     user_doc = user.model_dump()
@@ -198,12 +311,121 @@ async def login(credentials: UserLogin):
 @api_router.get("/user/dashboard", response_model=UserDashboard)
 async def get_user_dashboard(current_user: User = Depends(get_current_user)):
     commission_data = await calculate_user_commission(current_user.id)
+    
+    # Check if driver needs to complete checklist
+    week_start = get_week_start()
+    checklist_completed = True
+    
+    if current_user.role == "driver" and current_user.assigned_day:
+        checklist_completed = await check_checklist_completed(current_user.id, week_start)
+    
     return UserDashboard(
         user=current_user,
         deliveries=commission_data["deliveries"],
         total_deliveries=commission_data["total_deliveries"],
-        total_commission=commission_data["total_commission"]
+        total_commission=commission_data["total_commission"],
+        checklist_completed=checklist_completed,
+        current_week_start=week_start
     )
+
+@api_router.get("/checklist/template")
+async def get_checklist_template(current_user: User = Depends(get_current_user)):
+    """Get the checklist template structure"""
+    if current_user.role != "driver":
+        raise HTTPException(status_code=403, detail="Only drivers can access checklist")
+    
+    if not current_user.assigned_day:
+        raise HTTPException(status_code=400, detail="Driver not assigned to any day")
+    
+    return {
+        "assigned_day": current_user.assigned_day,
+        "categories": CHECKLIST_ITEMS
+    }
+
+@api_router.get("/checklist/current")
+async def get_current_checklist(current_user: User = Depends(get_current_user)):
+    """Get current week's checklist for the user"""
+    if current_user.role != "driver":
+        raise HTTPException(status_code=403, detail="Only drivers can access checklist")
+    
+    week_start = get_week_start()
+    checklist = await db.checklists.find_one({
+        "user_id": current_user.id,
+        "week_start": week_start
+    }, {"_id": 0})
+    
+    if not checklist:
+        # Create new checklist for this week
+        new_checklist = ChecklistRecord(
+            user_id=current_user.id,
+            user_name=current_user.name,
+            week_start=week_start,
+            completed=False,
+            items={}
+        )
+        checklist_doc = new_checklist.model_dump()
+        await db.checklists.insert_one(checklist_doc)
+        return new_checklist
+    
+    return ChecklistRecord(**checklist)
+
+@api_router.post("/checklist/submit")
+async def submit_checklist(submission: ChecklistSubmission, current_user: User = Depends(get_current_user)):
+    """Submit completed checklist"""
+    if current_user.role != "driver":
+        raise HTTPException(status_code=403, detail="Only drivers can submit checklist")
+    
+    week_start = get_week_start()
+    
+    # Validate all items are filled
+    for category, items in CHECKLIST_ITEMS.items():
+        if category not in submission.items:
+            raise HTTPException(status_code=400, detail=f"Category '{category}' is missing")
+        for item in items:
+            if item not in submission.items[category] or not submission.items[category][item]:
+                raise HTTPException(status_code=400, detail=f"Item '{item}' in category '{category}' is not filled")
+    
+    # Update or create checklist
+    existing = await db.checklists.find_one({
+        "user_id": current_user.id,
+        "week_start": week_start
+    })
+    
+    if existing:
+        await db.checklists.update_one(
+            {"id": existing['id']},
+            {"$set": {
+                "items": submission.items,
+                "completed": True,
+                "submitted_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+    else:
+        checklist = ChecklistRecord(
+            user_id=current_user.id,
+            user_name=current_user.name,
+            week_start=week_start,
+            completed=True,
+            items=submission.items,
+            submitted_at=datetime.now(timezone.utc)
+        )
+        checklist_doc = checklist.model_dump()
+        checklist_doc['submitted_at'] = checklist_doc['submitted_at'].isoformat()
+        await db.checklists.insert_one(checklist_doc)
+    
+    return {"message": "Checklist submitted successfully", "completed": True}
+
+@api_router.get("/admin/checklists")
+async def get_all_checklists(admin: User = Depends(get_admin_user)):
+    """Admin endpoint to view all checklists"""
+    checklists = await db.checklists.find({}, {"_id": 0}).sort("week_start", -1).to_list(1000)
+    return checklists
+
+@api_router.get("/admin/checklists/week/{week_start}")
+async def get_checklists_by_week(week_start: str, admin: User = Depends(get_admin_user)):
+    """Admin endpoint to view checklists for a specific week"""
+    checklists = await db.checklists.find({"week_start": week_start}, {"_id": 0}).to_list(100)
+    return checklists
 
 @api_router.get("/admin/users", response_model=List[AdminUserSummary])
 async def get_all_users(admin: User = Depends(get_admin_user)):

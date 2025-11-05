@@ -3,8 +3,11 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, Truck, DollarSign, Package } from 'lucide-react';
+import { LogOut, Truck, DollarSign, Package, ClipboardCheck, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -22,6 +25,10 @@ const TRUCK_RATES = {
 function UserDashboard({ user, token, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [checklistOpen, setChecklistOpen] = useState(false);
+  const [checklistTemplate, setChecklistTemplate] = useState(null);
+  const [checklistData, setChecklistData] = useState({});
+  const [submittingChecklist, setSubmittingChecklist] = useState(false);
   const navigate = useNavigate();
 
   const fetchDashboard = async () => {
@@ -30,6 +37,11 @@ function UserDashboard({ user, token, onLogout }) {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDashboardData(response.data);
+      
+      // Auto-open checklist if not completed and user is a driver
+      if (user.role === 'driver' && !response.data.checklist_completed) {
+        fetchChecklistTemplate();
+      }
     } catch (error) {
       toast.error('Failed to load dashboard');
       if (error.response?.status === 401) {
@@ -38,6 +50,63 @@ function UserDashboard({ user, token, onLogout }) {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchChecklistTemplate = async () => {
+    try {
+      const response = await axios.get(`${API}/checklist/template`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setChecklistTemplate(response.data);
+      
+      // Initialize checklist data
+      const initialData = {};
+      Object.entries(response.data.categories).forEach(([category, items]) => {
+        initialData[category] = {};
+        items.forEach(item => {
+          initialData[category][item] = '';
+        });
+      });
+      setChecklistData(initialData);
+      
+      // Fetch current checklist if exists
+      const currentResponse = await axios.get(`${API}/checklist/current`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (currentResponse.data.items && Object.keys(currentResponse.data.items).length > 0) {
+        setChecklistData(currentResponse.data.items);
+      }
+    } catch (error) {
+      console.error('Failed to load checklist template', error);
+    }
+  };
+
+  const handleChecklistSubmit = async () => {
+    // Validate all fields are filled
+    for (const [category, items] of Object.entries(checklistData)) {
+      for (const [item, value] of Object.entries(items)) {
+        if (!value || value.trim() === '') {
+          toast.error(`Por favor, preencha: ${item}`);
+          return;
+        }
+      }
+    }
+
+    setSubmittingChecklist(true);
+    try {
+      await axios.post(
+        `${API}/checklist/submit`,
+        { items: checklistData },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Checklist enviado com sucesso!');
+      setChecklistOpen(false);
+      fetchDashboard();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Falha ao enviar checklist');
+    } finally {
+      setSubmittingChecklist(false);
     }
   };
 
@@ -52,6 +121,8 @@ function UserDashboard({ user, token, onLogout }) {
       </div>
     );
   }
+
+  const needsChecklist = user.role === 'driver' && user.assigned_day && !dashboardData?.checklist_completed;
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
@@ -75,6 +146,7 @@ function UserDashboard({ user, token, onLogout }) {
                 <div className="hidden sm:block">
                   <p className="text-sm font-semibold text-white" data-testid="user-name">{user.name}</p>
                   <p className="text-xs text-white/80 capitalize" data-testid="user-role">{user.role}</p>
+                  {user.assigned_day && <p className="text-xs text-white/60">{user.assigned_day}</p>}
                 </div>
               </div>
               <Button 
@@ -93,8 +165,34 @@ function UserDashboard({ user, token, onLogout }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Checklist Alert */}
+        {needsChecklist && (
+          <Card className="mb-6 border-orange-300 bg-orange-50" data-testid="checklist-alert">
+            <CardContent className="pt-6">
+              <div className="flex items-start space-x-4">
+                <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-lg text-orange-900 mb-1">Checklist Pendente</h3>
+                  <p className="text-orange-800 mb-3">
+                    Você precisa completar o checklist semanal antes de visualizar suas comissões.
+                    Dia atribuído: <span className="font-semibold">{user.assigned_day}</span>
+                  </p>
+                  <Button 
+                    onClick={() => setChecklistOpen(true)}
+                    data-testid="open-checklist-button"
+                    className="bg-orange-600 hover:bg-orange-700"
+                  >
+                    <ClipboardCheck className="w-4 h-4 mr-2" />
+                    Completar Checklist
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Summary Cards - Blurred if checklist not completed */}
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 ${needsChecklist ? 'opacity-50 pointer-events-none blur-sm' : ''}`}>
           <Card className="shadow-xl" data-testid="total-deliveries-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg font-semibold">Total Deliveries</CardTitle>
@@ -102,7 +200,7 @@ function UserDashboard({ user, token, onLogout }) {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-purple-600" data-testid="total-deliveries-count">
-                {dashboardData?.total_deliveries || 0}
+                {needsChecklist ? '---' : (dashboardData?.total_deliveries || 0)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Across all trucks</p>
             </CardContent>
@@ -115,22 +213,22 @@ function UserDashboard({ user, token, onLogout }) {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-bold text-green-600" data-testid="total-commission-amount">
-                R$ {dashboardData?.total_commission?.toFixed(2) || '0.00'}
+                {needsChecklist ? 'R$ ---' : `R$ ${dashboardData?.total_commission?.toFixed(2) || '0.00'}`}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Total earned</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Delivery Breakdown */}
-        <Card className="shadow-xl">
+        {/* Delivery Breakdown - Blurred if checklist not completed */}
+        <Card className={`shadow-xl ${needsChecklist ? 'opacity-50 pointer-events-none blur-sm' : ''}`}>
           <CardHeader>
             <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Delivery Breakdown by Truck</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(TRUCK_RATES).map(([truck, rate]) => {
-                const count = dashboardData?.deliveries?.[truck] || 0;
+                const count = needsChecklist ? 0 : (dashboardData?.deliveries?.[truck] || 0);
                 const commission = count * rate;
                 return (
                   <div 
@@ -144,9 +242,11 @@ function UserDashboard({ user, token, onLogout }) {
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">Rate: R$ {rate.toFixed(2)}</p>
-                      <p className="text-2xl font-bold text-purple-600" data-testid={`truck-${truck}-deliveries`}>{count}</p>
+                      <p className="text-2xl font-bold text-purple-600" data-testid={`truck-${truck}-deliveries`}>
+                        {needsChecklist ? '---' : count}
+                      </p>
                       <p className="text-sm font-semibold text-green-600" data-testid={`truck-${truck}-commission`}>
-                        R$ {commission.toFixed(2)}
+                        {needsChecklist ? 'R$ ---' : `R$ ${commission.toFixed(2)}`}
                       </p>
                     </div>
                   </div>
@@ -156,6 +256,57 @@ function UserDashboard({ user, token, onLogout }) {
           </CardContent>
         </Card>
       </main>
+
+      {/* Checklist Dialog */}
+      <Dialog open={checklistOpen} onOpenChange={setChecklistOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="checklist-dialog">
+          <DialogHeader>
+            <DialogTitle className="text-2xl" style={{ fontFamily: 'Space Grotesk' }}>Checklist Semanal</DialogTitle>
+            <DialogDescription>
+              Complete todos os itens do checklist para visualizar suas comissões
+            </DialogDescription>
+          </DialogHeader>
+          
+          {checklistTemplate && (
+            <div className="space-y-6 mt-4">
+              {Object.entries(checklistTemplate.categories).map(([category, items]) => (
+                <div key={category} className="border rounded-lg p-4 bg-muted/30">
+                  <h3 className="font-bold text-lg mb-3" style={{ fontFamily: 'Space Grotesk' }}>{category}</h3>
+                  <div className="space-y-3">
+                    {items.map((item) => (
+                      <div key={item} className="space-y-1">
+                        <Label className="text-sm capitalize">{item}</Label>
+                        <Input
+                          value={checklistData[category]?.[item] || ''}
+                          onChange={(e) => setChecklistData({
+                            ...checklistData,
+                            [category]: {
+                              ...checklistData[category],
+                              [item]: e.target.value
+                            }
+                          })}
+                          placeholder="Digite sua resposta"
+                          data-testid={`checklist-${category}-${item}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              
+              <Button 
+                onClick={handleChecklistSubmit}
+                data-testid="submit-checklist-button"
+                className="w-full h-12 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                disabled={submittingChecklist}
+              >
+                <ClipboardCheck className="w-5 h-5 mr-2" />
+                {submittingChecklist ? 'Enviando...' : 'Enviar Checklist'}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
