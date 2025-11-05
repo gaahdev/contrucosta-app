@@ -363,6 +363,311 @@ class CommissionTrackerAPITester:
             
         return success1 and success2 and success3
 
+    def test_assigned_driver_registration(self):
+        """Test driver registration with assigned day names"""
+        timestamp = datetime.now().strftime('%H%M%S')
+        
+        # Test driver with assigned day (Davi)
+        success, response = self.run_test(
+            "Assigned Driver Registration (Davi)",
+            "POST",
+            "auth/register",
+            200,
+            data={
+                "username": f"davi_{timestamp}",
+                "password": "TestPass123!",
+                "name": "Davi",
+                "role": "driver"
+            }
+        )
+        
+        if success and 'user' in response:
+            user = response['user']
+            if user.get('assigned_day') == 'Monday':
+                print(f"✅ Davi correctly assigned to Monday")
+                self.assigned_driver_token = response['token']
+                self.assigned_driver_id = user['id']
+                return True
+            else:
+                print(f"❌ Davi assigned to {user.get('assigned_day')}, expected Monday")
+                return False
+        return False
+
+    def test_unassigned_driver_registration(self):
+        """Test driver registration with non-assigned name"""
+        timestamp = datetime.now().strftime('%H%M%S')
+        
+        success, response = self.run_test(
+            "Unassigned Driver Registration",
+            "POST",
+            "auth/register",
+            200,
+            data={
+                "username": f"random_{timestamp}",
+                "password": "TestPass123!",
+                "name": "Random Driver",
+                "role": "driver"
+            }
+        )
+        
+        if success and 'user' in response:
+            user = response['user']
+            if user.get('assigned_day') is None:
+                print(f"✅ Random driver correctly has no assigned day")
+                return True
+            else:
+                print(f"❌ Random driver incorrectly assigned to {user.get('assigned_day')}")
+                return False
+        return False
+
+    def test_helper_registration(self):
+        """Test helper registration"""
+        timestamp = datetime.now().strftime('%H%M%S')
+        
+        success, response = self.run_test(
+            "Helper Registration",
+            "POST",
+            "auth/register",
+            200,
+            data={
+                "username": f"helper_{timestamp}",
+                "password": "TestPass123!",
+                "name": "Test Helper",
+                "role": "helper"
+            }
+        )
+        
+        if success and 'user' in response:
+            user = response['user']
+            self.helper_token = response['token']
+            self.test_helper_id = user['id']
+            if user.get('assigned_day') is None and user.get('role') == 'helper':
+                print(f"✅ Helper correctly has no assigned day")
+                return True
+            else:
+                print(f"❌ Helper incorrectly assigned day or wrong role")
+                return False
+        return False
+
+    def test_checklist_template(self):
+        """Test checklist template endpoint"""
+        if not self.assigned_driver_token:
+            print("❌ Skipping checklist template test - no assigned driver token")
+            return False
+            
+        success, response = self.run_test(
+            "Checklist Template",
+            "GET",
+            "checklist/template",
+            200,
+            headers={"Authorization": f"Bearer {self.assigned_driver_token}"}
+        )
+        
+        if success:
+            # Verify structure
+            if 'assigned_day' not in response or 'categories' not in response:
+                print("❌ Missing required fields in checklist template")
+                return False
+                
+            # Verify assigned day
+            if response['assigned_day'] != 'Monday':
+                print(f"❌ Wrong assigned day: {response['assigned_day']}")
+                return False
+                
+            # Verify all categories are present
+            categories = response['categories']
+            for expected_cat in self.expected_categories:
+                if expected_cat not in categories:
+                    print(f"❌ Missing category: {expected_cat}")
+                    return False
+                    
+            # Verify categories have items
+            for cat, items in categories.items():
+                if not isinstance(items, list) or len(items) == 0:
+                    print(f"❌ Category {cat} has no items")
+                    return False
+                    
+            print(f"✅ Checklist template has all {len(self.expected_categories)} categories")
+            return True
+        return False
+
+    def test_checklist_template_helper_access(self):
+        """Test that helpers cannot access checklist template"""
+        if not self.helper_token:
+            print("❌ Skipping helper checklist access test - no helper token")
+            return False
+            
+        success, response = self.run_test(
+            "Checklist Template (Helper Access)",
+            "GET",
+            "checklist/template",
+            403,
+            headers={"Authorization": f"Bearer {self.helper_token}"}
+        )
+        return success
+
+    def test_checklist_current(self):
+        """Test current checklist endpoint"""
+        if not self.assigned_driver_token:
+            print("❌ Skipping current checklist test - no assigned driver token")
+            return False
+            
+        success, response = self.run_test(
+            "Current Checklist",
+            "GET",
+            "checklist/current",
+            200,
+            headers={"Authorization": f"Bearer {self.assigned_driver_token}"}
+        )
+        
+        if success:
+            # Verify structure
+            required_fields = ['user_id', 'user_name', 'week_start', 'completed', 'items']
+            for field in required_fields:
+                if field not in response:
+                    print(f"❌ Missing field in current checklist: {field}")
+                    return False
+                    
+            print(f"✅ Current checklist structure correct")
+            return True
+        return False
+
+    def test_checklist_submit_incomplete(self):
+        """Test checklist submission with incomplete data"""
+        if not self.assigned_driver_token:
+            print("❌ Skipping incomplete checklist test - no assigned driver token")
+            return False
+            
+        # Submit incomplete checklist (missing items)
+        success, response = self.run_test(
+            "Checklist Submit (Incomplete)",
+            "POST",
+            "checklist/submit",
+            400,
+            data={"items": {"Motor": {"verificar óleo do motor": "OK"}}},
+            headers={"Authorization": f"Bearer {self.assigned_driver_token}"}
+        )
+        return success
+
+    def test_checklist_submit_complete(self):
+        """Test complete checklist submission"""
+        if not self.assigned_driver_token:
+            print("❌ Skipping complete checklist test - no assigned driver token")
+            return False
+            
+        # First get template to build complete submission
+        template_success, template = self.run_test(
+            "Get Template for Submission",
+            "GET",
+            "checklist/template",
+            200,
+            headers={"Authorization": f"Bearer {self.assigned_driver_token}"}
+        )
+        
+        if not template_success:
+            return False
+            
+        # Build complete checklist data
+        complete_items = {}
+        for category, items in template['categories'].items():
+            complete_items[category] = {}
+            for item in items:
+                complete_items[category][item] = "OK - Verificado"
+                
+        success, response = self.run_test(
+            "Checklist Submit (Complete)",
+            "POST",
+            "checklist/submit",
+            200,
+            data={"items": complete_items},
+            headers={"Authorization": f"Bearer {self.assigned_driver_token}"}
+        )
+        
+        if success and response.get('completed'):
+            print("✅ Checklist submitted successfully")
+            return True
+        return False
+
+    def test_dashboard_checklist_blocking(self):
+        """Test that dashboard shows checklist completion status"""
+        if not self.assigned_driver_token:
+            print("❌ Skipping dashboard checklist test - no assigned driver token")
+            return False
+            
+        success, response = self.run_test(
+            "Dashboard Checklist Status",
+            "GET",
+            "user/dashboard",
+            200,
+            headers={"Authorization": f"Bearer {self.assigned_driver_token}"}
+        )
+        
+        if success:
+            # Verify checklist_completed field exists
+            if 'checklist_completed' not in response:
+                print("❌ Missing checklist_completed field in dashboard")
+                return False
+                
+            # Should be True after completing checklist
+            if response['checklist_completed']:
+                print("✅ Dashboard shows checklist completed")
+                return True
+            else:
+                print("❌ Dashboard shows checklist not completed")
+                return False
+        return False
+
+    def test_helper_dashboard_no_checklist(self):
+        """Test that helper dashboard doesn't require checklist"""
+        if not self.helper_token:
+            print("❌ Skipping helper dashboard test - no helper token")
+            return False
+            
+        success, response = self.run_test(
+            "Helper Dashboard (No Checklist)",
+            "GET",
+            "user/dashboard",
+            200,
+            headers={"Authorization": f"Bearer {self.helper_token}"}
+        )
+        
+        if success:
+            # Helper should always have checklist_completed as True
+            if response.get('checklist_completed', False):
+                print("✅ Helper dashboard doesn't require checklist")
+                return True
+            else:
+                print("❌ Helper dashboard incorrectly requires checklist")
+                return False
+        return False
+
+    def test_admin_checklists(self):
+        """Test admin view all checklists"""
+        if not self.admin_token:
+            print("❌ Skipping admin checklists test - no admin token")
+            return False
+            
+        success, response = self.run_test(
+            "Admin View All Checklists",
+            "GET",
+            "admin/checklists",
+            200,
+            headers={"Authorization": f"Bearer {self.admin_token}"}
+        )
+        
+        if success:
+            print(f"✅ Admin can view {len(response)} checklists")
+            # Verify structure if checklists exist
+            if len(response) > 0:
+                checklist = response[0]
+                required_fields = ['user_id', 'user_name', 'week_start', 'completed']
+                for field in required_fields:
+                    if field not in checklist:
+                        print(f"❌ Missing field in admin checklist: {field}")
+                        return False
+            return True
+        return False
+
 def main():
     print("🚛 Commission Tracker API Testing")
     print("=" * 50)
