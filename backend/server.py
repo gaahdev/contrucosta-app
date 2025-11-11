@@ -224,6 +224,20 @@ def get_assigned_day(name: str) -> Optional[str]:
     """Get assigned day for driver based on name"""
     return DAY_ASSIGNMENTS.get(name)
 
+def is_assigned_day_today(assigned_day: str) -> bool:
+    """Check if today is the assigned day for the driver"""
+    today = datetime.now(timezone.utc)
+    current_day = today.strftime("%A")  # Returns day name like "Monday", "Tuesday", etc.
+    return current_day == assigned_day
+
+def should_complete_checklist(user: User, week_start: str) -> bool:
+    """Determine if user should complete checklist based on their assigned day and current day"""
+    if user.role != "driver" or not user.assigned_day:
+        return False
+    
+    # Check if today is the assigned day
+    return is_assigned_day_today(user.assigned_day)
+
 # Calculate commission for a user
 async def calculate_user_commission(user_id: str) -> dict:
     deliveries = await db.deliveries.find({"user_id": user_id}, {"_id": 0}).to_list(100)
