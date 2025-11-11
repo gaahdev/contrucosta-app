@@ -326,11 +326,12 @@ async def login(credentials: UserLogin):
 async def get_user_dashboard(current_user: User = Depends(get_current_user)):
     commission_data = await calculate_user_commission(current_user.id)
     
-    # Check if driver needs to complete checklist
+    # Check if driver needs to complete checklist based on assigned day
     week_start = get_week_start()
     checklist_completed = True
     
-    if current_user.role == "driver" and current_user.assigned_day:
+    # Only require checklist if it's the driver's assigned day
+    if should_complete_checklist(current_user, week_start):
         checklist_completed = await check_checklist_completed(current_user.id, week_start)
     
     return UserDashboard(
