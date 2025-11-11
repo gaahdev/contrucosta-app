@@ -175,7 +175,10 @@ function UserDashboard({ user, token, onLogout }) {
                   <h3 className="font-bold text-lg text-orange-900 mb-1">Checklist Pendente</h3>
                   <p className="text-orange-800 mb-3">
                     Você precisa completar o checklist semanal antes de visualizar suas comissões.
-                    Dia atribuído: <span className="font-semibold">{user.assigned_day}</span>
+                    <br />
+                    <span className="font-semibold">Seu dia atribuído: {user.assigned_day}</span>
+                    <br />
+                    <span className="text-sm">Você deve preencher o checklist apenas no seu dia atribuído.</span>
                   </p>
                   <Button 
                     onClick={() => setChecklistOpen(true)}
