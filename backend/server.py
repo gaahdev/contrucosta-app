@@ -423,6 +423,13 @@ async def submit_checklist(submission: ChecklistSubmission, current_user: User =
     if current_user.role != "driver":
         raise HTTPException(status_code=403, detail="Only drivers can submit checklist")
     
+    # Check if today is the assigned day
+    if not can_fill_checklist(current_user):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"You can only submit the checklist on your assigned day: {current_user.assigned_day}"
+        )
+    
     week_start = get_week_start()
     
     # Validate all items are filled
