@@ -178,11 +178,15 @@ function UserDashboard({ user, token, onLogout }) {
                 <div className="flex-1">
                   <h3 className="font-bold text-lg text-orange-900 mb-1">Checklist Pendente</h3>
                   <p className="text-orange-800 mb-3">
-                    Você precisa completar o checklist semanal antes de visualizar suas comissões.
+                    ⚠️ Você precisa completar o checklist semanal antes de visualizar suas comissões.
                     <br />
                     <span className="font-semibold">Seu dia atribuído: {user.assigned_day}</span>
                     <br />
-                    <span className="text-sm">Você deve preencher o checklist apenas no seu dia atribuído.</span>
+                    <span className="text-sm">
+                      {is_assigned_day_today(user.assigned_day) 
+                        ? '✅ Hoje é seu dia! Você pode preencher o checklist agora.' 
+                        : `⏳ Você deve preencher o checklist apenas em ${user.assigned_day}. Após passar seu dia sem preencher, as comissões permanecerão bloqueadas até você completar o checklist.`}
+                    </span>
                   </p>
                   <Button 
                     onClick={() => setChecklistOpen(true)}
@@ -190,7 +194,7 @@ function UserDashboard({ user, token, onLogout }) {
                     className="bg-orange-600 hover:bg-orange-700"
                   >
                     <ClipboardCheck className="w-4 h-4 mr-2" />
-                    Completar Checklist
+                    {is_assigned_day_today(user.assigned_day) ? 'Completar Checklist Agora' : 'Ver Checklist'}
                   </Button>
                 </div>
               </div>
