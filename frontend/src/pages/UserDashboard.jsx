@@ -22,6 +22,14 @@ const TRUCK_RATES = {
   AUA: 10.00
 };
 
+// Helper function to check if today is the assigned day
+const is_assigned_day_today = (assignedDay) => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const today = new Date().getDay();
+  const todayName = days[today];
+  return todayName === assignedDay;
+};
+
 function UserDashboard({ user, token, onLogout }) {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
