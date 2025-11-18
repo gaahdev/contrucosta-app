@@ -377,9 +377,17 @@ async def get_checklist_template(current_user: User = Depends(get_current_user))
     if not current_user.assigned_day:
         raise HTTPException(status_code=400, detail="Driver not assigned to any day")
     
+    # Check if today is the assigned day to fill the checklist
+    if not can_fill_checklist(current_user):
+        raise HTTPException(
+            status_code=403, 
+            detail=f"You can only fill the checklist on your assigned day: {current_user.assigned_day}"
+        )
+    
     return {
         "assigned_day": current_user.assigned_day,
-        "categories": CHECKLIST_ITEMS
+        "categories": CHECKLIST_ITEMS,
+        "can_fill": True
     }
 
 @api_router.get("/checklist/current")
