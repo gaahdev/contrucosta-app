@@ -235,7 +235,32 @@ def should_complete_checklist(user: User, week_start: str) -> bool:
     if user.role != "driver" or not user.assigned_day:
         return False
     
-    # Check if today is the assigned day
+    # Driver must complete checklist once their assigned day has passed in the current week
+    today = datetime.now(timezone.utc)
+    current_day_index = today.weekday()  # 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, 5=Saturday, 6=Sunday
+    
+    # Map assigned days to indices
+    day_map = {
+        "Monday": 0,
+        "Tuesday": 1,
+        "Wednesday": 2,
+        "Thursday": 3,
+        "Friday": 4,
+        "Saturday": 5,
+        "Sunday": 6
+    }
+    
+    assigned_day_index = day_map.get(user.assigned_day, -1)
+    if assigned_day_index == -1:
+        return False
+    
+    # If today is on or after the assigned day in the current week, checklist is required
+    return current_day_index >= assigned_day_index
+
+def can_fill_checklist(user: User) -> bool:
+    """Check if today is the driver's assigned day (can fill checklist)"""
+    if user.role != "driver" or not user.assigned_day:
+        return False
     return is_assigned_day_today(user.assigned_day)
 
 # Calculate commission for a user
