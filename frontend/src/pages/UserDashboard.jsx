@@ -78,7 +78,11 @@ function UserDashboard({ user, token, onLogout }) {
         setChecklistData(currentResponse.data.items);
       }
     } catch (error) {
-      console.error('Failed to load checklist template', error);
+      if (error.response?.status === 403) {
+        toast.error('Você só pode preencher o checklist no seu dia atribuído: ' + user.assigned_day);
+      } else {
+        console.error('Failed to load checklist template', error);
+      }
     }
   };
 
