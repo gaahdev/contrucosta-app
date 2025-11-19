@@ -60,7 +60,7 @@ CHECKLIST_ITEMS = {
     ],
     "Direção": [
         "verificar óleo da direção",
-        "diro da direção",
+        "giro da direção",
         "se há barulho na direção",
         "barra de direção",
         "as molas"
