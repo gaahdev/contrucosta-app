@@ -258,10 +258,33 @@ def should_complete_checklist(user: User, week_start: str) -> bool:
     return current_day_index >= assigned_day_index
 
 def can_fill_checklist(user: User) -> bool:
-    """Check if today is the driver's assigned day (can fill checklist)"""
+    """Check if the driver can fill the checklist today.
+    
+    Alteração: agora permite que o motorista preencha o check-list no **dia atribuído ou em qualquer dia posterior da mesma semana**.
+    Ou seja: se ele esqueceu no dia dele, pode preencher nos dias seguintes daquela semana.
+    """
     if user.role != "driver" or not user.assigned_day:
         return False
-    return is_assigned_day_today(user.assigned_day)
+
+    today = datetime.now(timezone.utc)
+    current_day_index = today.weekday()
+
+    day_map = {
+        "Monday": 0,
+        "Tuesday": 1,
+        "Wednesday": 2,
+        "Thursday": 3,
+        "Friday": 4,
+        "Saturday": 5,
+        "Sunday": 6
+    }
+
+    assigned_day_index = day_map.get(user.assigned_day, -1)
+    if assigned_day_index == -1:
+        return False
+
+    # Allow filling on the assigned day or any day after it within the same week
+    return current_day_index >= assigned_day_index
 
 # Calculate commission for a user
 async def calculate_user_commission(user_id: str) -> dict:
@@ -355,7 +378,7 @@ async def get_user_dashboard(current_user: User = Depends(get_current_user)):
     week_start = get_week_start()
     checklist_completed = True
     
-    # Only require checklist if it's the driver's assigned day
+    # Only require checklist if it's the driver's assigned day (or passed) in the week
     if should_complete_checklist(current_user, week_start):
         checklist_completed = await check_checklist_completed(current_user.id, week_start)
     
@@ -377,11 +400,11 @@ async def get_checklist_template(current_user: User = Depends(get_current_user))
     if not current_user.assigned_day:
         raise HTTPException(status_code=400, detail="Driver not assigned to any day")
     
-    # Check if today is the assigned day to fill the checklist
+    # Check if today is the assigned day or after it to fill the checklist
     if not can_fill_checklist(current_user):
         raise HTTPException(
             status_code=403, 
-            detail=f"You can only fill the checklist on your assigned day: {current_user.assigned_day}"
+            detail=f"Você pode preencher o check-list apenas no dia atribuído ou em dias posteriores desta semana: {current_user.assigned_day}"
         )
     
     return {
@@ -423,11 +446,11 @@ async def submit_checklist(submission: ChecklistSubmission, current_user: User =
     if current_user.role != "driver":
         raise HTTPException(status_code=403, detail="Only drivers can submit checklist")
     
-    # Check if today is the assigned day
+    # Check if today is the assigned day or after it
     if not can_fill_checklist(current_user):
         raise HTTPException(
             status_code=403, 
-            detail=f"You can only submit the checklist on your assigned day: {current_user.assigned_day}"
+            detail=f"Você só pode submeter o check-list no dia atribuído ou em dias posteriores desta semana: {current_user.assigned_day}"
         )
     
     week_start = get_week_start()
