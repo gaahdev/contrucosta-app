@@ -8,12 +8,26 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #660000 0%, #0b0b0b 100%);
   min-height: 100vh;
 }
 
 .App {
   min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.app-logo {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 h1, h2, h3, h4, h5, h6 {

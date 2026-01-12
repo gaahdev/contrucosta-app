@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { toast } from 'sonner';
-import { UserPlus, Truck } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -45,12 +45,12 @@ function Register({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
       <Card className="w-full max-w-md shadow-2xl" data-testid="register-card">
         <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center mb-2">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
-              <Truck className="w-8 h-8 text-white" />
+            <div className="p-3 bg-gradient-to-br from-red-700 to-black rounded-2xl shadow-lg">
+              <img src="/logo.jpg" alt="Construcosta Logo" className="w-8 h-8 object-contain" />
             </div>
           </div>
           <CardTitle className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>Create Account</CardTitle>
@@ -112,7 +112,7 @@ function Register({ onLogin }) {
             <Button 
               type="submit" 
               data-testid="register-submit-button"
-              className="w-full h-11 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+              className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
               disabled={loading}
             >
               <UserPlus className="w-4 h-4 mr-2" />
@@ -121,7 +121,7 @@ function Register({ onLogin }) {
           </form>
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Already have an account? </span>
-            <Link to="/login" className="font-semibold text-purple-600 hover:text-purple-700" data-testid="login-link">
+            <Link to="/login" className="font-semibold text-red-600 hover:text-red-700" data-testid="login-link">
               Sign in
             </Link>
           </div>

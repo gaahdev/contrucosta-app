@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
-import { LogOut, Truck, DollarSign, Package, ClipboardCheck, AlertCircle } from 'lucide-react';
+import { LogOut, DollarSign, Package, ClipboardCheck, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -128,7 +128,7 @@ function UserDashboard({ user, token, onLogout }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
         <div className="text-white text-xl">Loading...</div>
       </div>
     );
@@ -137,21 +137,21 @@ function UserDashboard({ user, token, onLogout }) {
   const needsChecklist = user.role === 'driver' && user.assigned_day && !dashboardData?.checklist_completed;
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
       {/* Header */}
       <header className="bg-white/10 backdrop-blur-md border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-white/20 rounded-lg">
-                <Truck className="w-6 h-6 text-white" />
+                <img src="/logo.jpg" alt="Construcosta Logo" className="w-6 h-6 object-contain" />
               </div>
               <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>Commission Tracker</h1>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <Avatar>
-                  <AvatarFallback className="bg-purple-600 text-white">
+                  <AvatarFallback className="bg-red-600 text-white">
                     {user.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -212,13 +212,13 @@ function UserDashboard({ user, token, onLogout }) {
 
         {/* Summary Cards - Blurred if checklist not completed */}
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 ${needsChecklist ? 'opacity-50 pointer-events-none blur-sm' : ''}`}>
-          <Card className="shadow-xl" data-testid="total-deliveries-card">
+              <Card className="shadow-xl" data-testid="total-deliveries-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-lg font-semibold">Total Deliveries</CardTitle>
-              <Package className="w-5 h-5 text-purple-600" />
+              <Package className="w-5 h-5 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-purple-600" data-testid="total-deliveries-count">
+              <div className="text-4xl font-bold text-red-600" data-testid="total-deliveries-count">
                 {needsChecklist ? '---' : (dashboardData?.total_deliveries || 0)}
               </div>
               <p className="text-sm text-muted-foreground mt-1">Across all trucks</p>
@@ -245,23 +245,23 @@ function UserDashboard({ user, token, onLogout }) {
             <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Delivery Breakdown by Truck</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.entries(TRUCK_RATES).map(([truck, rate]) => {
                 const count = needsChecklist ? 0 : (dashboardData?.deliveries?.[truck] || 0);
                 const commission = count * rate;
                 return (
                   <div 
                     key={truck} 
-                    className="p-4 rounded-lg bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200"
+                    className="p-4 rounded-lg bg-gradient-to-br from-red-50 to-red-100 border border-red-200"
                     data-testid={`truck-card-${truck}`}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="font-bold text-lg" style={{ fontFamily: 'Space Grotesk' }}>{truck}</h3>
-                      <Truck className="w-5 h-5 text-purple-600" />
+                      <img src="/logo.jpg" alt="logo" className="w-5 h-5 object-contain" />
                     </div>
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground">Rate: R$ {rate.toFixed(2)}</p>
-                      <p className="text-2xl font-bold text-purple-600" data-testid={`truck-${truck}-deliveries`}>
+                      <p className="text-2xl font-bold text-red-600" data-testid={`truck-${truck}-deliveries`}>
                         {needsChecklist ? '---' : count}
                       </p>
                       <p className="text-sm font-semibold text-green-600" data-testid={`truck-${truck}-commission`}>
@@ -316,7 +316,7 @@ function UserDashboard({ user, token, onLogout }) {
               <Button 
                 onClick={handleChecklistSubmit}
                 data-testid="submit-checklist-button"
-                className="w-full h-12 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+                className="w-full h-12 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
                 disabled={submittingChecklist}
               >
                 <ClipboardCheck className="w-5 h-5 mr-2" />

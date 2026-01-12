@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
-import { LogOut, Truck, Users, DollarSign, Edit, ClipboardCheck } from 'lucide-react';
+import { LogOut, Users, DollarSign, Edit, ClipboardCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
@@ -121,7 +121,7 @@ function AdminDashboard({ user, token, onLogout }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
         <div className="text-white text-xl">Loading...</div>
       </div>
     );
@@ -132,21 +132,21 @@ function AdminDashboard({ user, token, onLogout }) {
   const totalDeliveries = users.reduce((sum, u) => sum + u.total_deliveries, 0);
 
   return (
-    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
       {/* Header */}
       <header className="bg-white/10 backdrop-blur-md border-b border-white/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-white/20 rounded-lg">
-                <Truck className="w-6 h-6 text-white" />
+                <img src="/logo.jpg" alt="Construcosta Logo" className="w-6 h-6 object-contain" />
               </div>
               <h1 className="text-2xl font-bold text-white" style={{ fontFamily: 'Space Grotesk' }}>Admin Panel</h1>
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <Avatar>
-                  <AvatarFallback className="bg-purple-600 text-white">
+                  <AvatarFallback className="bg-red-600 text-white">
                     {user.name.charAt(0).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -194,10 +194,10 @@ function AdminDashboard({ user, token, onLogout }) {
               <Card className="shadow-xl" data-testid="admin-total-deliveries-card">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-lg font-semibold">Total Deliveries</CardTitle>
-                  <Truck className="w-5 h-5 text-purple-600" />
+                  <img src="/logo.jpg" alt="logo" className="w-5 h-5 object-contain" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-4xl font-bold text-purple-600" data-testid="admin-total-deliveries">{totalDeliveries}</div>
+                  <div className="text-4xl font-bold text-red-600" data-testid="admin-total-deliveries">{totalDeliveries}</div>
                   <p className="text-sm text-muted-foreground mt-1">All trucks</p>
                 </CardContent>
               </Card>
@@ -254,7 +254,7 @@ function AdminDashboard({ user, token, onLogout }) {
                                   size="sm" 
                                   onClick={() => handleEditClick(userData)}
                                   data-testid={`edit-user-button-${userData.user.username}`}
-                                  className="bg-purple-600 hover:bg-purple-700"
+                                  className="bg-red-600 hover:bg-red-700"
                                 >
                                   <Edit className="w-4 h-4 mr-1" />
                                   Edit
@@ -311,7 +311,7 @@ function AdminDashboard({ user, token, onLogout }) {
                                   <Button 
                                     onClick={handleUpdateDelivery} 
                                     data-testid="update-delivery-button"
-                                    className="w-full bg-purple-600 hover:bg-purple-700"
+                                    className="w-full bg-red-600 hover:bg-red-700"
                                   >
                                     Update Delivery
                                   </Button>

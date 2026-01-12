@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { toast } from 'sonner';
-import { Truck, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -43,12 +43,12 @@ function Login({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
       <Card className="w-full max-w-md shadow-2xl" data-testid="login-card">
         <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center mb-2">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
-              <Truck className="w-8 h-8 text-white" />
+            <div className="p-3 bg-gradient-to-br from-red-700 to-black rounded-2xl shadow-lg">
+              <img src="/logo.jpg" alt="Construcosta Logo" className="w-12 h-12 object-contain" />
             </div>
           </div>
           <CardTitle className="text-3xl font-bold" style={{ fontFamily: 'Space Grotesk' }}>Commission Tracker</CardTitle>
@@ -85,7 +85,7 @@ function Login({ onLogin }) {
             <Button 
               type="submit" 
               data-testid="login-submit-button"
-              className="w-full h-11 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700"
+              className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
               disabled={loading}
             >
               <LogIn className="w-4 h-4 mr-2" />
@@ -94,7 +94,7 @@ function Login({ onLogin }) {
           </form>
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">Don't have an account? </span>
-            <Link to="/register" className="font-semibold text-purple-600 hover:text-purple-700" data-testid="register-link">
+            <Link to="/register" className="font-semibold text-red-600 hover:text-red-700" data-testid="register-link">
               Register here
             </Link>
           </div>

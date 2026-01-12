@@ -34,9 +34,21 @@ function App() {
     localStorage.removeItem('token');
   };
 
+  const Header = () => {
+    const { useLocation } = require('react-router-dom');
+    const location = useLocation();
+    if (['/login', '/register'].includes(location.pathname)) return null;
+    return (
+      <header className="app-header">
+        <img src="/logo.jpg" alt="Construcosta Logo" className="app-logo" />
+      </header>
+    );
+  };
+
   return (
     <div className="App">
       <BrowserRouter>
+        <Header />
         <Routes>
           <Route path="/login" element={!token ? <Login onLogin={handleLogin} /> : <Navigate to={user?.role === 'admin' ? '/admin' : '/dashboard'} />} />
           <Route path="/register" element={!token ? <Register onLogin={handleLogin} /> : <Navigate to="/dashboard" />} />
