@@ -122,7 +122,14 @@ function AdminDashboard({ user, token, onLogout }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
-        <div className="text-white text-xl">Loading...</div>
+        <video
+          src="/loading.mp4"
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-64 h-64 object-contain rounded-md shadow-lg"
+        />
       </div>
     );
   }
