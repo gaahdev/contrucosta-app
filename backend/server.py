@@ -681,8 +681,11 @@ async def get_employee_summary(employee_id: str):
             by_truck[truck]["count"] += 1
             by_truck[truck]["total_value"] += d.get("value", 0)
     
-    # Conta ocorrências
-    occurrences = await db.occurrences.find({"employee_id": employee_id}, {"_id": 0}).to_list(1000)
+    # Busca ocorrências detalhadas
+    occurrences = await db.occurrences.find(
+        {"employee_id": employee_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(200)
     occurrence_count = len(occurrences)
     
     # Calcula percentual
@@ -707,7 +710,8 @@ async def get_employee_summary(employee_id: str):
         "value_to_receive": round(value_to_receive, 2),
         "by_truck": by_truck,
         "occurrence_count": occurrence_count,
-        "percentage": percentage
+        "percentage": percentage,
+        "occurrences": occurrences
     }
 
 app.include_router(api_router)

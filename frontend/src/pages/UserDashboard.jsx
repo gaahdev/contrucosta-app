@@ -9,6 +9,21 @@ import { useNavigate } from 'react-router-dom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
+const occurrenceTypeLabel = {
+  delay: 'Atraso',
+  damage: 'Dano',
+  accident: 'Acidente',
+  missing_goods: 'Falta de Mercadoria',
+  other: 'Outro'
+};
+
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('pt-BR');
+};
+
 function UserDashboard({ user, token, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [employeeSummary, setEmployeeSummary] = useState(null);
@@ -157,6 +172,40 @@ function UserDashboard({ user, token, onLogout }) {
                 </CardContent>
               </Card>
             )}
+
+            <Card className="shadow-xl mb-8">
+              <CardHeader>
+                <CardTitle className="text-xl">⚠️ Suas Ocorrências</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {employeeSummary.occurrences && employeeSummary.occurrences.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-3">Data</th>
+                          <th className="text-left py-2 px-3">Tipo</th>
+                          <th className="text-left py-2 px-3">Caminhão</th>
+                          <th className="text-left py-2 px-3">Descrição</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {employeeSummary.occurrences.map((occurrence, index) => (
+                          <tr key={`${occurrence.created_at || 'occ'}-${index}`} className="border-b hover:bg-gray-50">
+                            <td className="py-2 px-3">{formatDateTime(occurrence.created_at)}</td>
+                            <td className="py-2 px-3">{occurrenceTypeLabel[occurrence.type] || occurrence.type || '-'}</td>
+                            <td className="py-2 px-3">{occurrence.truck_type || '-'}</td>
+                            <td className="py-2 px-3">{occurrence.description || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma ocorrência registrada para você.</p>
+                )}
+              </CardContent>
+            </Card>
           </>
         ) : (
           <div className="text-center py-8">

@@ -131,6 +131,7 @@ export const OccurrenceLogger = ({ onOccurrenceLogged }) => {
             >
               <option value="delay">Atraso na Entrega</option>
               <option value="damage">Dano em Mercadoria</option>
+              <option value="missing_goods">Falta de Mercadoria</option>
               <option value="other">Outro</option>
             </select>
           </div>

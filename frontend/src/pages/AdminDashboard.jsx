@@ -370,6 +370,7 @@ function AdminDashboard({ user, token, onLogout }) {
                                         <SelectItem value="delay">🕐 Atraso</SelectItem>
                                         <SelectItem value="damage">💥 Dano</SelectItem>
                                         <SelectItem value="accident">🚗 Acidente</SelectItem>
+                                        <SelectItem value="missing_goods">📦 Falta de Mercadoria</SelectItem>
                                         <SelectItem value="other">❓ Outro</SelectItem>
                                       </SelectContent>
                                     </Select>
