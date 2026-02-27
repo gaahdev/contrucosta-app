@@ -136,15 +136,32 @@ class User(BaseModel):
 class DeliveryRecord(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
+    employee_id: str
     truck_type: str
-    delivery_count: int = 0
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    value: float
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-class DeliveryUpdate(BaseModel):
-    user_id: str
+class DeliveryCreate(BaseModel):
+    employee_id: str
     truck_type: str
-    delivery_count: int
+    value: float
+
+class OccurrenceRecord(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    employee_id: str
+    employee_name: str
+    occurrence_type: str
+    description: str
+    truck_type: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class OccurrenceCreate(BaseModel):
+    employee_id: str
+    employee_name: str
+    occurrence_type: str
+    description: str
+    truck_type: str
 
 class ChecklistSubmission(BaseModel):
     items: Dict[str, Dict[str, str]]  # category -> item -> response
@@ -565,6 +582,145 @@ async def update_delivery(delivery_update: DeliveryUpdate, admin: User = Depends
 async def get_user_deliveries(user_id: str, admin: User = Depends(get_admin_user)):
     deliveries = await db.deliveries.find({"user_id": user_id}, {"_id": 0}).to_list(100)
     return deliveries
+
+# NOVO SISTEMA DE COMISSÃO - endpoints por valor (não por contagem)
+@api_router.post("/api/deliveries")
+async def create_delivery(payload: DeliveryCreate):
+    """Registra uma entrega com valor por caminhão"""
+    if payload.truck_type not in TRUCK_RATES:
+        raise HTTPException(status_code=400, detail="Invalid truck type")
+    
+    delivery = {
+        "id": str(uuid.uuid4()),
+        "employee_id": payload.employee_id,
+        "truck_type": payload.truck_type,
+        "value": payload.value,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.deliveries.insert_one(delivery)
+    return {"success": True, "delivery": delivery}
+
+@api_router.post("/api/occurrences")
+async def create_occurrence(payload: OccurrenceCreate):
+    """Registra uma ocorrência"""
+    occurrence = {
+        "id": str(uuid.uuid4()),
+        "employee_id": payload.employee_id,
+        "employee_name": payload.employee_name,
+        "type": payload.occurrence_type,
+        "description": payload.description,
+        "truck_type": payload.truck_type,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.occurrences.insert_one(occurrence)
+    return {"success": True, "occurrence": occurrence}
+
+@api_router.get("/api/admin/users")
+async def get_admin_users_new():
+    """Retorna lista de usuários com novo sistema de comissão"""
+    users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0, "password": 0}).to_list(1000)
+    
+    result = []
+    for user_data in users:
+        user_id = user_data["id"]
+        
+        # Busca entregas
+        deliveries = await db.deliveries.find({"employee_id": user_id}, {"_id": 0}).to_list(1000)
+        total_delivered = sum(d.get("value", 0) for d in deliveries)
+        
+        # Agrupa por caminhão
+        by_truck = {}
+        for d in deliveries:
+            truck = d.get("truck_type", "")
+            if truck:
+                if truck not in by_truck:
+                    by_truck[truck] = {"count": 0, "total_value": 0}
+                by_truck[truck]["count"] += 1
+                by_truck[truck]["total_value"] += d.get("value", 0)
+        
+        # Conta ocorrências
+        occurrences = await db.occurrences.find({"employee_id": user_id}, {"_id": 0}).to_list(1000)
+        occurrence_count = len(occurrences)
+        
+        # Calcula percentual (0.8, 0.9, 1.0)
+        if occurrence_count >= 5:
+            percentage = 0.8
+        elif occurrence_count >= 2:
+            percentage = 0.9
+        else:
+            percentage = 1.0
+        
+        # Calcula valor a receber
+        value_to_receive = total_delivered * percentage
+        
+        result.append({
+            "user": {
+                "id": user_data["id"],
+                "name": user_data["name"],
+                "username": user_data["username"],
+                "role": user_data["role"],
+                "assigned_day": user_data.get("assigned_day")
+            },
+            "total_deliveries": len(deliveries),
+            "total_commission": round(value_to_receive, 2),
+            "total_delivered_value": round(total_delivered, 2),
+            "value_to_receive": round(value_to_receive, 2),
+            "by_truck": by_truck,
+            "statistics": {
+                "occurrence_count": occurrence_count,
+                "percentage": percentage
+            }
+        })
+    
+    return result
+
+@api_router.get("/api/employees/{employee_id}")
+async def get_employee_summary(employee_id: str):
+    """Retorna resumo de entrega de um motorista"""
+    # Busca entregas
+    deliveries = await db.deliveries.find({"employee_id": employee_id}, {"_id": 0}).to_list(1000)
+    total_delivered = sum(d.get("value", 0) for d in deliveries)
+    
+    # Agrupa por caminhão
+    by_truck = {}
+    for d in deliveries:
+        truck = d.get("truck_type", "")
+        if truck:
+            if truck not in by_truck:
+                by_truck[truck] = {"count": 0, "total_value": 0}
+            by_truck[truck]["count"] += 1
+            by_truck[truck]["total_value"] += d.get("value", 0)
+    
+    # Conta ocorrências
+    occurrences = await db.occurrences.find({"employee_id": employee_id}, {"_id": 0}).to_list(1000)
+    occurrence_count = len(occurrences)
+    
+    # Calcula percentual
+    if occurrence_count >= 5:
+        percentage = 0.8
+    elif occurrence_count >= 2:
+        percentage = 0.9
+    else:
+        percentage = 1.0
+    
+    # Calcula valor a receber
+    value_to_receive = total_delivered * percentage
+    
+    # Busca dados do usuário
+    user = await db.users.find_one({"id": employee_id}, {"_id": 0, "password": 0})
+    user_name = user.get("name", f"Funcionário {employee_id}") if user else f"Funcionário {employee_id}"
+    
+    return {
+        "employee_id": employee_id,
+        "name": user_name,
+        "total_delivered_value": round(total_delivered, 2),
+        "value_to_receive": round(value_to_receive, 2),
+        "by_truck": by_truck,
+        "occurrence_count": occurrence_count,
+        "percentage": percentage
+    }
 
 app.include_router(api_router)
 
