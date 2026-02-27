@@ -314,9 +314,9 @@ async def get_admin_users():
         else:
             percentage = 1.0
         
-        # Calcula valor a receber
-        value_to_receive = total_delivered * (percentage / 100)
-        commission = value_to_receive * (percentage / 100)
+        # Calcula valor a receber (percentage já é decimal: 0.8, 0.9, 1.0)
+        value_to_receive = total_delivered * percentage
+        commission = value_to_receive  # Commission é o mesmo que value_to_receive
         
         result.append({
             "user": {

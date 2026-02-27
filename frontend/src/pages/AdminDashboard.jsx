@@ -358,6 +358,7 @@ function AdminDashboard({ user, token, onLogout }) {
                         <th className="text-right py-3 px-4 font-semibold whitespace-nowrap">📦 Valor Entregue</th>
                         <th className="text-right py-3 px-4 font-semibold whitespace-nowrap">💰 Valor a Receber</th>
                         <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">🚛 Caminhões</th>
+                        <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">⚠️ Ocorrências</th>
                         <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">Ações</th>
                       </tr>
                     </thead>
@@ -381,6 +382,11 @@ function AdminDashboard({ user, token, onLogout }) {
                                 </span>
                               ))}
                             </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded text-sm font-semibold">
+                              {userData.statistics?.occurrence_count || 0}
+                            </span>
                           </td>
                           <td className="py-3 px-4 text-center">
                             <div className="flex gap-1 items-center justify-center">
