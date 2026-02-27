@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Contrucosta</string>
+    <string name="title_activity_main">Contrucosta</string>
+    <string name="package_name">com.contrucosta.app</string>
+    <string name="custom_url_scheme">com.contrucosta.app</string>
+</resources>

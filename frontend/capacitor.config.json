@@ -1,0 +1,11 @@
+{
+  "appId": "com.contrucosta.app",
+  "appName": "Contrucosta",
+  "webDir": "build",
+  "bundledWebRuntime": false,
+  "server": {
+    "allowNavigation": [
+      "https://territorial-shaylah-zetsu-0ec52e74.koyeb.app"
+    ]
+  }
+}

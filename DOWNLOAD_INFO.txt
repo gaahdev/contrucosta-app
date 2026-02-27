@@ -1,0 +1,93 @@
+╔═══════════════════════════════════════════════════════════════╗
+║                    INFORMAÇÕES DE DOWNLOAD                    ║
+║              Contrucosta App - Versão 1.0.0                  ║
+╚═══════════════════════════════════════════════════════════════╝
+
+ARQUIVOS PRINCIPAIS:
+═══════════════════════════════════════════════════════════════
+
+1. Contrucosta.App.exe (Windows)
+   Tamanho: 204 MB
+   Hash MD5: 7a680c120d342877aadb8f528ecbecf7
+   Localização: /workspaces/contrucosta-app/Contrucosta.App.exe
+   Tipo: PE32+ executável (GUI) x86-64
+
+2. app-debug.apk (Android)
+   Tamanho: 6.2 MB
+   Localização: /workspaces/contrucosta-app/app-debug.apk
+   Tipo: Android Debug APK
+
+COMO USAR:
+═══════════════════════════════════════════════════════════════
+
+WINDOWS:
+  1. Fazer download de Contrucosta.App.exe
+  2. Clique duplo no arquivo
+  3. Se aparecer aviso: "Executar mesmo assim"
+  4. Aplicação abrirá automaticamente
+
+ANDROID:
+  1. Conectar dispositivo via USB
+  2. Executar: adb install app-debug.apk
+  3. Abrir "Contrucosta App" no dispositivo
+  OU
+  1. Transferir arquivo via Bluetooth/Google Drive/Email
+  2. Clicar no arquivo no dispositivo
+
+WEB (LOCAL):
+  1. npm start (em /frontend)
+  2. Acessa: http://localhost:3000
+
+VERIFICAÇÃO:
+═══════════════════════════════════════════════════════════════
+
+Para verificar integridade dos arquivos:
+
+MD5 Windows:
+  Esperado: 7a680c120d342877aadb8f528ecbecf7
+  Verificar: md5sum Contrucosta.App.exe
+
+SHA256 (se disponível):
+  Calcular: sha256sum Contrucosta.App.exe
+
+REQUISITOS:
+═══════════════════════════════════════════════════════════════
+
+WINDOWS:
+  - Windows 10 ou 11
+  - Arquitetura: 64-bit (x86-64)
+  - Espaço em disco: 500 MB
+  - RAM: 2GB mínimo recomendado
+
+ANDROID:
+  - Android 10+
+  - Espaço em disco: 50 MB
+  - RAM: 1GB mínimo
+
+DOCUMENTAÇÃO:
+═══════════════════════════════════════════════════════════════
+
+- QUICK_START.md (Comece aqui!)
+- SETUP_COMPLETE.md (Resumo completo)
+- WINDOWS_EXECUTABLE_GUIDE.md (Guia Windows)
+- FILES_LOCATION.md (Locais dos arquivos)
+- COMPILATION_REPORT.md (Detalhes técnicos)
+
+SUPORTE:
+═══════════════════════════════════════════════════════════════
+
+Problema: Windows bloqueando .exe
+Solução: Clique "Mais informações" → "Executar mesmo assim"
+
+Problema: APK não instala
+Solução: Verificar conexão USB, usar adb install -r app-debug.apk
+
+Problema: Aplicação não abre
+Solução: Verificar espaço em disco, antivírus, permissões
+
+═══════════════════════════════════════════════════════════════
+
+Data: 2024-02-04
+Versão: 1.0.0
+Status: ✅ Pronto para uso
+

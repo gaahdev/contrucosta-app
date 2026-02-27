@@ -13,6 +13,9 @@ from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 import jwt
 
+# Import commission routes
+from commission_routes import create_commission_router
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -564,6 +567,10 @@ async def get_user_deliveries(user_id: str, admin: User = Depends(get_admin_user
     return deliveries
 
 app.include_router(api_router)
+
+# Register commission routes (novo sistema de comissões)
+commission_router = create_commission_router(db, security)
+app.include_router(commission_router)
 
 app.add_middleware(
     CORSMiddleware,

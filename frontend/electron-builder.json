@@ -1,0 +1,52 @@
+{
+  "name": "contrucosta-app",
+  "version": "1.0.0",
+  "description": "Contrucosta - Aplicação de gestão",
+  "main": "public/electron.js",
+  "homepage": "./",
+  "author": "Contrucosta",
+  "build": {
+    "appId": "com.contrucosta.app",
+    "productName": "Contrucosta App",
+    "files": [
+      "build/**/*",
+      "public/electron.js",
+      "public/window.js",
+      "public/preload.js",
+      "node_modules/**/*"
+    ],
+    "directories": {
+      "buildResources": "public"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/logo.ico",
+      "certificateFile": null,
+      "certificatePassword": null,
+      "signingHashAlgorithms": [
+        "sha256"
+      ],
+      "sign": null
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Contrucosta App"
+    }
+  }
+}

@@ -1,0 +1,28 @@
+FROM ubuntu:22.04
+
+# Install Java 11 and Android SDK dependencies
+RUN apt-get update && apt-get install -y \
+    openjdk-11-jdk \
+    wget \
+    unzip \
+    git \
+    gradle \
+    android-sdk-build-tools \
+    android-sdk-platform-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set Android SDK and Java home
+ENV ANDROID_HOME=/usr/lib/android-sdk
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH=$JAVA_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH
+
+# Accept licenses
+RUN mkdir -p $ANDROID_HOME/licenses && \
+    echo "d56f5187479451eabf01fb78affce41e1e1b1a38" > $ANDROID_HOME/licenses/android-sdk-license && \
+    echo "d56f5187479451eabf01fb78affce41e1e1b1a38" > $ANDROID_HOME/licenses/google-android-sdk-license
+
+WORKDIR /workspace
+
+COPY frontend/android ./
+
+CMD ["./gradlew", "assembleDebug"]
