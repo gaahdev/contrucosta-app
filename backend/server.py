@@ -571,9 +571,14 @@ async def create_delivery(payload: DeliveryCreate):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    result = await db.deliveries.insert_one(delivery)
+    delivery_doc = delivery.copy()
+    result = await db.deliveries.insert_one(delivery_doc)
     logger.info(f"✅ Entrega inserida no MongoDB: {payload.employee_id} - {payload.truck_type} - R${payload.value} (ID: {result.inserted_id})")
-    return {"success": True, "delivery": delivery}
+    return {
+        "success": True,
+        "delivery": delivery,
+        "inserted_id": str(result.inserted_id)
+    }
 
 @api_router.post("/occurrences")
 async def create_occurrence(payload: OccurrenceCreate):
@@ -588,9 +593,14 @@ async def create_occurrence(payload: OccurrenceCreate):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    result = await db.occurrences.insert_one(occurrence)
+    occurrence_doc = occurrence.copy()
+    result = await db.occurrences.insert_one(occurrence_doc)
     logger.info(f"✅ Ocorrência inserida no MongoDB: {payload.employee_id} - {payload.occurrence_type} (ID: {result.inserted_id})")
-    return {"success": True, "occurrence": occurrence}
+    return {
+        "success": True,
+        "occurrence": occurrence,
+        "inserted_id": str(result.inserted_id)
+    }
 
 @api_router.get("/admin/users")
 async def get_admin_users_new():
