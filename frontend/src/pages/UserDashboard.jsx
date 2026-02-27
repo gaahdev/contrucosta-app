@@ -62,8 +62,6 @@ function UserDashboard({ user, token, onLogout }) {
     );
   }
 
-  const needsChecklist = user.role === 'driver' && user.assigned_day && !dashboardData?.checklist_completed;
-
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
       {/* Header */}
