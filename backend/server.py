@@ -17,12 +17,22 @@ import jwt
 from commission_routes import create_commission_router
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+# Carregar .env local se existir
+env_file = ROOT_DIR / '.env'
+if env_file.exists():
+    load_dotenv(env_file)
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+# MongoDB connection - tenta variável de ambiente primeiro, depois .env
+mongo_url = os.environ.get('MONGO_URL') or os.environ.get('MONGODB_URI')
+if not mongo_url:
+    raise ValueError("MONGO_URL ou MONGODB_URI não configurada!")
+
+db_name = os.environ.get('DB_NAME', 'commission_tracker')
+
+print(f"🔗 Conectando ao MongoDB...")
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
+print(f"✅ Conectado a {db_name}")
 
 # Security
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -561,7 +571,8 @@ async def create_delivery(payload: DeliveryCreate):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.deliveries.insert_one(delivery)
+    result = await db.deliveries.insert_one(delivery)
+    logger.info(f"✅ Entrega inserida no MongoDB: {payload.employee_id} - {payload.truck_type} - R${payload.value} (ID: {result.inserted_id})")
     return {"success": True, "delivery": delivery}
 
 @api_router.post("/api/occurrences")
@@ -577,13 +588,15 @@ async def create_occurrence(payload: OccurrenceCreate):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.occurrences.insert_one(occurrence)
+    result = await db.occurrences.insert_one(occurrence)
+    logger.info(f"✅ Ocorrência inserida no MongoDB: {payload.employee_id} - {payload.occurrence_type} (ID: {result.inserted_id})")
     return {"success": True, "occurrence": occurrence}
 
 @api_router.get("/api/admin/users")
 async def get_admin_users_new():
     """Retorna lista de usuários com novo sistema de comissão"""
     users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0, "password": 0}).to_list(1000)
+    logger.info(f"📋 Buscando dados de {len(users)} usuários do MongoDB")
     
     result = []
     for user_data in users:
@@ -617,6 +630,8 @@ async def get_admin_users_new():
         
         # Calcula valor a receber
         value_to_receive = total_delivered * percentage
+        
+        logger.info(f"  👤 {user_data['name']}: {len(deliveries)} entregas (R${total_delivered:.2f}), {occurrence_count} ocorrências, {percentage*100:.0f}% comissão")
         
         result.append({
             "user": {
