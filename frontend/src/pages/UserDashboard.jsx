@@ -44,8 +44,10 @@ function UserDashboard({ user, token, onLogout }) {
   useEffect(() => {
     console.log('UserDashboard montado, user:', user);
     setLoading(false);
-    fetchEmployeeSummary();
-  }, []);
+    if (user?.id) {
+      fetchEmployeeSummary();
+    }
+  }, [user?.id]);
 
   if (loading) {
     return (
