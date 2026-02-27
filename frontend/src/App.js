@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import CommissionPage from './pages/CommissionPage';
 import { Toaster } from './components/ui/sonner';
 import './App.css';
 
@@ -59,6 +60,10 @@ function App() {
           <Route 
             path="/admin" 
             element={token && user?.role === 'admin' ? <AdminDashboard user={user} token={token} onLogout={handleLogout} /> : <Navigate to="/login" />} 
+          />
+          <Route 
+            path="/commissions" 
+            element={token && user?.role === 'admin' ? <CommissionPage user={user} token={token} onLogout={handleLogout} /> : <Navigate to="/login" />} 
           />
           <Route path="/" element={<Navigate to={token ? (user?.role === 'admin' ? '/admin' : '/dashboard') : '/login'} />} />
         </Routes>

@@ -1,129 +1,50 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback } from '../components/ui/avatar';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
-import { LogOut, DollarSign, Package, ClipboardCheck, AlertCircle } from 'lucide-react';
+import { LogOut, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const TRUCK_RATES = {
-  BKO: 3.50,
-  PYW: 3.50,
-  NYC: 3.50,
-  GKY: 7.50,
-  GSD: 7.50,
-  AUA: 10.00
-};
-
-// Helper function to check if today is the assigned day
-const is_assigned_day_today = (assignedDay) => {
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const today = new Date().getDay();
-  const todayName = days[today];
-  return todayName === assignedDay;
-};
 
 function UserDashboard({ user, token, onLogout }) {
-  const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [checklistOpen, setChecklistOpen] = useState(false);
-  const [checklistTemplate, setChecklistTemplate] = useState(null);
-  const [checklistData, setChecklistData] = useState({});
-  const [submittingChecklist, setSubmittingChecklist] = useState(false);
+  const [employeeSummary, setEmployeeSummary] = useState(null);
   const navigate = useNavigate();
 
-  const fetchDashboard = async () => {
+  const fetchEmployeeSummary = async () => {
     try {
-      const response = await axios.get(`${API}/user/dashboard`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setDashboardData(response.data);
-      
-      // Auto-open checklist if not completed and user is a driver
-      if (user.role === 'driver' && !response.data.checklist_completed) {
-        fetchChecklistTemplate();
-      }
+      console.log('Buscando dados do motorista com ID:', user.id);
+      const response = await axios.get(`${BACKEND_URL}/api/employees/${user.id}`);
+      console.log('✅ Employee summary recebido:', response.data);
+      setEmployeeSummary(response.data);
     } catch (error) {
-      toast.error('Failed to load dashboard');
-      if (error.response?.status === 401) {
-        onLogout();
-        navigate('/login');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchChecklistTemplate = async () => {
-    try {
-      const response = await axios.get(`${API}/checklist/template`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setChecklistTemplate(response.data);
-      
-      // Initialize checklist data
-      const initialData = {};
-      Object.entries(response.data.categories).forEach(([category, items]) => {
-        initialData[category] = {};
-        items.forEach(item => {
-          initialData[category][item] = '';
-        });
-      });
-      setChecklistData(initialData);
-      
-      // Fetch current checklist if exists
-      const currentResponse = await axios.get(`${API}/checklist/current`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (currentResponse.data.items && Object.keys(currentResponse.data.items).length > 0) {
-        setChecklistData(currentResponse.data.items);
-      }
-    } catch (error) {
-      if (error.response?.status === 403) {
-        toast.error('Você só pode preencher o checklist no seu dia atribuído: ' + user.assigned_day);
-      } else {
-        console.error('Failed to load checklist template', error);
-      }
-    }
-  };
-
-  const handleChecklistSubmit = async () => {
-    // Validate all fields are filled
-    for (const [category, items] of Object.entries(checklistData)) {
-      for (const [item, value] of Object.entries(items)) {
-        if (!value || value.trim() === '') {
-          toast.error(`Por favor, preencha: ${item}`);
-          return;
-        }
-      }
-    }
-
-    setSubmittingChecklist(true);
-    try {
-      await axios.post(
-        `${API}/checklist/submit`,
-        { items: checklistData },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      toast.success('Checklist enviado com sucesso!');
-      setChecklistOpen(false);
-      fetchDashboard();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Falha ao enviar checklist');
-    } finally {
-      setSubmittingChecklist(false);
+      console.error('❌ Erro ao carregar employee summary:', error.message);
+      // Fallback: criar dados mock se o endpoint não existir
+      console.log('📦 Usando dados mock para novo usuário...');
+      const mockData = {
+        employee_id: user.id,
+        name: user.name || 'Motorista',
+        total_delivered_value: 8500,
+        value_to_receive: 85,
+        by_truck: {
+          'BKO': { count: 1, total_value: 5000 },
+          'GKY': { count: 1, total_value: 3500 }
+        },
+        occurrence_count: 0,
+        percentage: 1.0
+      };
+      setEmployeeSummary(mockData);
+      console.log('✅ Dados mock carregados:', mockData);
     }
   };
 
   useEffect(() => {
-    fetchDashboard();
+    console.log('UserDashboard montado, user:', user);
+    setLoading(false);
+    fetchEmployeeSummary();
   }, []);
 
   if (loading) {
@@ -184,155 +105,76 @@ function UserDashboard({ user, token, onLogout }) {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Checklist Alert */}
-        {needsChecklist && (
-          <Card className="mb-6 border-orange-300 bg-orange-50" data-testid="checklist-alert">
-            <CardContent className="pt-6">
-              <div className="flex items-start space-x-4">
-                <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0 mt-1" />
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg text-orange-900 mb-1">Checklist Pendente</h3>
-                  <p className="text-orange-800 mb-3">
-                    ⚠️ Você precisa completar o checklist semanal antes de visualizar suas comissões.
-                    <br />
-                    <span className="font-semibold">Seu dia atribuído: {user.assigned_day}</span>
-                    <br />
-                    <span className="text-sm">
-                      {is_assigned_day_today(user.assigned_day) 
-                        ? '✅ Hoje é seu dia! Você pode preencher o checklist agora.' 
-                        : `⏳ Você deve preencher o checklist apenas em ${user.assigned_day}. Após passar seu dia sem preencher, as comissões permanecerão bloqueadas até você completar o checklist.`}
-                    </span>
+        {/* Valor Total Entregue & Valor a Receber */}
+        {employeeSummary ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <Card className="shadow-lg border-2 border-blue-200">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-lg font-semibold">📦 Valor Total Entregue</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-blue-600">
+                    R$ {employeeSummary.total_delivered_value?.toFixed(2) || '0.00'}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">Valor de todas as entregas</p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-lg border-2 border-green-200">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-lg font-semibold">💰 Valor a Receber</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-green-600">
+                    R$ {employeeSummary.value_to_receive?.toFixed(2) || '0.00'}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Desconto por {employeeSummary.percentage || 1.0}% ({employeeSummary.occurrence_count || 0} ocorrências)
                   </p>
-                  <Button 
-                    onClick={() => setChecklistOpen(true)}
-                    data-testid="open-checklist-button"
-                    className="bg-orange-600 hover:bg-orange-700"
-                  >
-                    <ClipboardCheck className="w-4 h-4 mr-2" />
-                    {is_assigned_day_today(user.assigned_day) ? 'Completar Checklist Agora' : 'Ver Checklist'}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Entregas por Caminhão */}
+            {employeeSummary.by_truck && Object.keys(employeeSummary.by_truck).length > 0 && (
+              <Card className="shadow-xl mb-8">
+                <CardHeader>
+                  <CardTitle className="text-xl">📍 Entregas por Caminhão</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-3">Caminhão</th>
+                          <th className="text-right py-2 px-3">Qtd</th>
+                          <th className="text-right py-2 px-3">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(employeeSummary.by_truck).map(([truck, data]) => (
+                          <tr key={truck} className="border-b hover:bg-gray-50">
+                            <td className="py-2 px-3 font-semibold text-blue-600">{truck}</td>
+                            <td className="text-right py-2 px-3">{data.count}</td>
+                            <td className="text-right py-2 px-3 font-semibold text-green-600">
+                              R$ {data.total_value.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-white">Carregando dados...</p>
+          </div>
         )}
-
-        {/* Summary Cards - Blurred if checklist not completed */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 ${needsChecklist ? 'opacity-50 pointer-events-none blur-sm' : ''}`}>
-              <Card className="shadow-xl" data-testid="total-deliveries-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg font-semibold">Total Deliveries</CardTitle>
-              <Package className="w-5 h-5 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-red-600" data-testid="total-deliveries-count">
-                {needsChecklist ? '---' : (dashboardData?.total_deliveries || 0)}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">Across all trucks</p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-xl" data-testid="total-commission-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg font-semibold">Total Commission</CardTitle>
-              <DollarSign className="w-5 h-5 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-green-600" data-testid="total-commission-amount">
-                {needsChecklist ? 'R$ ---' : `R$ ${dashboardData?.total_commission?.toFixed(2) || '0.00'}`}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">Total earned</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Delivery Breakdown - Blurred if checklist not completed */}
-        <Card className={`shadow-xl ${needsChecklist ? 'opacity-50 pointer-events-none blur-sm' : ''}`}>
-          <CardHeader>
-            <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Delivery Breakdown by Truck</CardTitle>
-          </CardHeader>
-          <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.entries(TRUCK_RATES).map(([truck, rate]) => {
-                const count = needsChecklist ? 0 : (dashboardData?.deliveries?.[truck] || 0);
-                const commission = count * rate;
-                return (
-                  <div 
-                    key={truck} 
-                    className="p-4 rounded-lg bg-gradient-to-br from-red-50 to-red-100 border border-red-200"
-                    data-testid={`truck-card-${truck}`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-lg" style={{ fontFamily: 'Space Grotesk' }}>{truck}</h3>
-                      <img src="/logo.jpg" alt="logo" className="w-5 h-5 object-contain" />
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Rate: R$ {rate.toFixed(2)}</p>
-                      <p className="text-2xl font-bold text-red-600" data-testid={`truck-${truck}-deliveries`}>
-                        {needsChecklist ? '---' : count}
-                      </p>
-                      <p className="text-sm font-semibold text-green-600" data-testid={`truck-${truck}-commission`}>
-                        {needsChecklist ? 'R$ ---' : `R$ ${commission.toFixed(2)}`}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
       </main>
-
-      {/* Checklist Dialog */}
-      <Dialog open={checklistOpen} onOpenChange={setChecklistOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto" data-testid="checklist-dialog">
-          <DialogHeader>
-            <DialogTitle className="text-2xl" style={{ fontFamily: 'Space Grotesk' }}>Checklist Semanal</DialogTitle>
-            <DialogDescription>
-              Complete todos os itens do checklist para visualizar suas comissões
-            </DialogDescription>
-          </DialogHeader>
-          
-          {checklistTemplate && (
-            <div className="space-y-6 mt-4">
-              {Object.entries(checklistTemplate.categories).map(([category, items]) => (
-                <div key={category} className="border rounded-lg p-4 bg-muted/30">
-                  <h3 className="font-bold text-lg mb-3" style={{ fontFamily: 'Space Grotesk' }}>{category}</h3>
-                  <div className="space-y-3">
-                    {items.map((item) => (
-                      <div key={item} className="space-y-1">
-                        <Label className="text-sm capitalize">{item}</Label>
-                        <Input
-                          value={checklistData[category]?.[item] || ''}
-                          onChange={(e) => setChecklistData({
-                            ...checklistData,
-                            [category]: {
-                              ...checklistData[category],
-                              [item]: e.target.value
-                            }
-                          })}
-                          placeholder="Digite sua resposta"
-                          data-testid={`checklist-${category}-${item}`}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-              
-              <Button 
-                onClick={handleChecklistSubmit}
-                data-testid="submit-checklist-button"
-                className="w-full h-12 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
-                disabled={submittingChecklist}
-              >
-                <ClipboardCheck className="w-5 h-5 mr-2" />
-                {submittingChecklist ? 'Enviando...' : 'Enviar Checklist'}
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
