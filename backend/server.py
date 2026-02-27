@@ -316,6 +316,55 @@ def can_fill_checklist(user: User) -> bool:
     # Allow filling on the assigned day or any day after it within the same week
     return current_day_index >= assigned_day_index
 
+def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int]) -> float:
+    """Calcula percentual por tier de ocorrências.
+
+    Regras:
+    - Mais ocorrências: 0.8%
+    - Ocorrências medianas: 0.9%
+    - Menos ocorrências: 1.0%
+    - Se todos tiverem 0 ocorrências: 1.0% para todos
+    """
+    if not occurrence_counts:
+        return 1.0
+
+    if all(count == 0 for count in occurrence_counts.values()):
+        return 1.0
+
+    sorted_employees = sorted(
+        occurrence_counts.items(),
+        key=lambda item: item[1],
+        reverse=True
+    )
+
+    positions = {emp_id: idx for idx, (emp_id, _) in enumerate(sorted_employees)}
+    position = positions.get(employee_id, len(sorted_employees) - 1)
+
+    total = len(sorted_employees)
+    tier_size = total / 3
+
+    if position < tier_size:
+        return 0.8
+    if position < tier_size * 2:
+        return 0.9
+    return 1.0
+
+async def get_occurrence_count_map() -> Dict[str, int]:
+    """Retorna mapa employee_id -> quantidade de ocorrências para todos os membros."""
+    users = await db.users.find(
+        {"role": {"$in": ["driver", "helper"]}},
+        {"_id": 0, "id": 1}
+    ).to_list(1000)
+
+    occurrence_counts: Dict[str, int] = {}
+    for user in users:
+        employee_id = user.get("id")
+        if not employee_id:
+            continue
+        occurrence_counts[employee_id] = await db.occurrences.count_documents({"employee_id": employee_id})
+
+    return occurrence_counts
+
 # Calculate commission for a user
 async def calculate_user_commission(user_id: str) -> dict:
     deliveries = await db.deliveries.find({"user_id": user_id}, {"_id": 0}).to_list(100)
@@ -607,6 +656,8 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
     """Retorna lista de usuários com novo sistema de comissão"""
     users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0, "password": 0}).to_list(1000)
     logger.info(f"📋 Buscando dados de {len(users)} usuários do MongoDB")
+
+    occurrence_counts = await get_occurrence_count_map()
     
     result = []
     for user_data in users:
@@ -626,17 +677,9 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
                 by_truck[truck]["count"] += 1
                 by_truck[truck]["total_value"] += d.get("value", 0)
         
-        # Conta ocorrências
-        occurrences = await db.occurrences.find({"employee_id": user_id}, {"_id": 0}).to_list(1000)
-        occurrence_count = len(occurrences)
-        
-        # Calcula percentual (0.8, 0.9, 1.0)
-        if occurrence_count >= 5:
-            percentage = 0.8
-        elif occurrence_count >= 2:
-            percentage = 0.9
-        else:
-            percentage = 1.0
+        # Conta ocorrências e calcula percentual por tier
+        occurrence_count = occurrence_counts.get(user_id, 0)
+        percentage = get_tier_percentage(user_id, occurrence_counts)
         
         # Calcula valor a receber (percentual de comissão)
         value_to_receive = total_delivered * (percentage / 100)
@@ -687,14 +730,10 @@ async def get_employee_summary(employee_id: str):
         {"_id": 0}
     ).sort("created_at", -1).to_list(200)
     occurrence_count = len(occurrences)
-    
-    # Calcula percentual
-    if occurrence_count >= 5:
-        percentage = 0.8
-    elif occurrence_count >= 2:
-        percentage = 0.9
-    else:
-        percentage = 1.0
+
+    # Calcula percentual por tier (comparando com todos os membros)
+    occurrence_counts = await get_occurrence_count_map()
+    percentage = get_tier_percentage(employee_id, occurrence_counts)
     
     # Calcula valor a receber (percentual de comissão)
     value_to_receive = total_delivered * (percentage / 100)
