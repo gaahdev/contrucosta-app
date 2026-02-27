@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: contrucosta-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd backend && python main.py
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: FRONTEND_URL
+        value: ${FRONTEND_URL}
+
+  - type: static_site
+    name: contrucosta-frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/build
+    envVars:
+      - key: REACT_APP_BACKEND_URL
+        value: ${BACKEND_URL}
