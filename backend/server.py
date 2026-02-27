@@ -535,7 +535,7 @@ async def get_checklists_by_week(week_start: str, admin: User = Depends(get_admi
     checklists = await db.checklists.find({"week_start": week_start}, {"_id": 0}).to_list(100)
     return checklists
 
-@api_router.get("/admin/users", response_model=List[AdminUserSummary])
+@api_router.get("/admin/users/legacy", response_model=List[AdminUserSummary])
 async def get_all_users(admin: User = Depends(get_admin_user)):
     users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0}).to_list(1000)
     
@@ -603,7 +603,7 @@ async def create_occurrence(payload: OccurrenceCreate):
     }
 
 @api_router.get("/admin/users")
-async def get_admin_users_new():
+async def get_admin_users_new(admin: User = Depends(get_admin_user)):
     """Retorna lista de usuários com novo sistema de comissão"""
     users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0, "password": 0}).to_list(1000)
     logger.info(f"📋 Buscando dados de {len(users)} usuários do MongoDB")
