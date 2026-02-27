@@ -557,7 +557,7 @@ async def get_user_deliveries(user_id: str, admin: User = Depends(get_admin_user
     return deliveries
 
 # NOVO SISTEMA DE COMISSÃO - endpoints por valor (não por contagem)
-@api_router.post("/api/deliveries")
+@api_router.post("/deliveries")
 async def create_delivery(payload: DeliveryCreate):
     """Registra uma entrega com valor por caminhão"""
     if payload.truck_type not in TRUCK_RATES:
@@ -575,7 +575,7 @@ async def create_delivery(payload: DeliveryCreate):
     logger.info(f"✅ Entrega inserida no MongoDB: {payload.employee_id} - {payload.truck_type} - R${payload.value} (ID: {result.inserted_id})")
     return {"success": True, "delivery": delivery}
 
-@api_router.post("/api/occurrences")
+@api_router.post("/occurrences")
 async def create_occurrence(payload: OccurrenceCreate):
     """Registra uma ocorrência"""
     occurrence = {
@@ -592,7 +592,7 @@ async def create_occurrence(payload: OccurrenceCreate):
     logger.info(f"✅ Ocorrência inserida no MongoDB: {payload.employee_id} - {payload.occurrence_type} (ID: {result.inserted_id})")
     return {"success": True, "occurrence": occurrence}
 
-@api_router.get("/api/admin/users")
+@api_router.get("/admin/users")
 async def get_admin_users_new():
     """Retorna lista de usuários com novo sistema de comissão"""
     users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0, "password": 0}).to_list(1000)
@@ -654,7 +654,7 @@ async def get_admin_users_new():
     
     return result
 
-@api_router.get("/api/employees/{employee_id}")
+@api_router.get("/employees/{employee_id}")
 async def get_employee_summary(employee_id: str):
     """Retorna resumo de entrega de um motorista"""
     # Busca entregas

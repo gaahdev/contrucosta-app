@@ -13,10 +13,11 @@ export const commissionService = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        employee_id: data.employee_id,
-        employee_name: data.employee_name,
-        occurrence_type: data.occurrence_type,
+        employee_id: data.employee_id || data.employeeId,
+        employee_name: data.employee_name || data.employeeName || '',
+        occurrence_type: data.occurrence_type || data.occurrenceType,
         description: data.description,
+        truck_type: data.truck_type || data.truckType || 'BKO',
       }),
     });
 
@@ -111,7 +112,7 @@ export const commissionService = {
    */
   async getCommissions(month, year) {
     const response = await fetch(
-      `${BACKEND_URL}/api/commission/history?month=${month}&year=${year}`
+      `${BACKEND_URL}/api/commission/commissions?month=${month}&year=${year}`
     );
 
     const responseData = await response.json();

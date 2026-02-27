@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { UserPlus } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
 
 function Register({ onLogin }) {
@@ -24,7 +24,7 @@ function Register({ onLogin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.role) {
       toast.error('Please select a role');
       return;
@@ -66,7 +66,7 @@ function Register({ onLogin }) {
                 type="text"
                 placeholder="Enter your full name"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 required
                 className="h-11"
               />
@@ -79,7 +79,7 @@ function Register({ onLogin }) {
                 type="text"
                 placeholder="Choose a username"
                 value={formData.username}
-                onChange={(e) => setFormData({...formData, username: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 required
                 className="h-11"
               />
@@ -92,14 +92,14 @@ function Register({ onLogin }) {
                 type="password"
                 placeholder="Create a password"
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 required
                 className="h-11"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({...formData, role: value})} required>
+              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })} required>
                 <SelectTrigger className="h-11" data-testid="register-role-select">
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
@@ -109,8 +109,8 @@ function Register({ onLogin }) {
                 </SelectContent>
               </Select>
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               data-testid="register-submit-button"
               className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
               disabled={loading}

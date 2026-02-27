@@ -7,37 +7,26 @@ import { toast } from 'sonner';
 import { LogOut, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 function UserDashboard({ user, token, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [employeeSummary, setEmployeeSummary] = useState(null);
+  const [loadError, setLoadError] = useState('');
   const navigate = useNavigate();
 
   const fetchEmployeeSummary = async () => {
     try {
+      setLoadError('');
       console.log('Buscando dados do motorista com ID:', user.id);
       const response = await axios.get(`${BACKEND_URL}/api/employees/${user.id}`);
       console.log('✅ Employee summary recebido:', response.data);
       setEmployeeSummary(response.data);
     } catch (error) {
       console.error('❌ Erro ao carregar employee summary:', error.message);
-      // Fallback: criar dados mock se o endpoint não existir
-      console.log('📦 Usando dados mock para novo usuário...');
-      const mockData = {
-        employee_id: user.id,
-        name: user.name || 'Motorista',
-        total_delivered_value: 8500,
-        value_to_receive: 85,
-        by_truck: {
-          'BKO': { count: 1, total_value: 5000 },
-          'GKY': { count: 1, total_value: 3500 }
-        },
-        occurrence_count: 0,
-        percentage: 1.0
-      };
-      setEmployeeSummary(mockData);
-      console.log('✅ Dados mock carregados:', mockData);
+      setEmployeeSummary(null);
+      setLoadError(error.response?.data?.detail || 'Não foi possível carregar os dados reais do usuário');
+      toast.error('Erro ao carregar dados do usuário');
     }
   };
 
@@ -89,10 +78,10 @@ function UserDashboard({ user, token, onLogout }) {
                   {user.assigned_day && <p className="text-xs text-white/60">{user.assigned_day}</p>}
                 </div>
               </div>
-              <Button 
-                onClick={onLogout} 
+              <Button
+                onClick={onLogout}
                 data-testid="logout-button"
-                variant="ghost" 
+                variant="ghost"
                 className="text-white hover:bg-white/20"
               >
                 <LogOut className="w-4 h-4 mr-2" />
@@ -171,7 +160,7 @@ function UserDashboard({ user, token, onLogout }) {
           </>
         ) : (
           <div className="text-center py-8">
-            <p className="text-white">Carregando dados...</p>
+            <p className="text-white">{loadError || 'Carregando dados...'}</p>
           </div>
         )}
       </main>

@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { toast } from 'sonner';
 import { LogIn } from 'lucide-react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
 
 function Login({ onLogin }) {
@@ -29,7 +29,7 @@ function Login({ onLogin }) {
 
       toast.success('Login successful!');
       onLogin(response.data.user, response.data.token);
-      
+
       if (response.data.user.role === 'admin') {
         navigate('/admin');
       } else {
@@ -82,8 +82,8 @@ function Login({ onLogin }) {
                 className="h-11"
               />
             </div>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               data-testid="login-submit-button"
               className="w-full h-11 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600"
               disabled={loading}

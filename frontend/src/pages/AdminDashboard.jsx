@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { LogOut, Users, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
 
 const TRUCK_TYPES = ['BKO', 'PYW', 'NYC', 'GKY', 'GSD', 'AUA'];
@@ -33,69 +33,21 @@ function AdminDashboard({ user, token, onLogout }) {
   const [commissionData, setCommissionData] = useState({ value: '', truck_type: 'BKO' });
   const [occurrenceData, setOccurrenceData] = useState({ type: 'delay', description: '', truck_type: 'BKO' });
   const [loadingCommission, setLoadingCommission] = useState(false);
-  
+
   const navigate = useNavigate();
 
   const fetchUsers = async () => {
     try {
-      // Tenta backend local primeiro
-      try {
-        console.log('Buscando usuários do backend local...');
-        const response = await axios.get('http://localhost:8000/api/admin/users', { timeout: 2000 });
-        setUsers(response.data);
-        console.log('✅ Usuários carregados do backend local');
-        return;
-      } catch (localError) {
-        console.log('Backend local indisponível, tentando remoto...');
-      }
-
-      // Tenta backend remoto com token
       const response = await axios.get(`${API}/admin/users`, {
         headers: { Authorization: `Bearer ${token}` },
         timeout: 5000
       });
       setUsers(response.data);
-      console.log('✅ Usuários carregados do backend remoto');
+      console.log('✅ Usuários carregados do backend');
     } catch (error) {
       console.error('Erro ao carregar usuários:', error.message);
-      
-      // Se falhar, usa dados mock
-      if (error.response?.status === 401 || error.response?.status === 404 || error.code === 'ECONNREFUSED') {
-        console.log('📦 Usando dados mock...');
-        const mockUsers = [
-          {
-            user: { id: 'emp_001', name: 'João Silva', username: 'joao_silva', role: 'driver', assigned_day: 'Monday' },
-            total_deliveries: 0,
-            total_commission: 0,
-            total_delivered_value: 0,
-            value_to_receive: 0,
-            by_truck: {},
-            statistics: { occurrence_count: 0, percentage: 1.0 }
-          },
-          {
-            user: { id: 'emp_002', name: 'Maria Santos', username: 'maria_santos', role: 'helper', assigned_day: 'Monday' },
-            total_deliveries: 0,
-            total_commission: 0,
-            total_delivered_value: 0,
-            value_to_receive: 0,
-            by_truck: {},
-            statistics: { occurrence_count: 0, percentage: 1.0 }
-          },
-          {
-            user: { id: 'emp_003', name: 'Pedro Costa', username: 'pedro_costa', role: 'driver', assigned_day: 'Monday' },
-            total_deliveries: 0,
-            total_commission: 0,
-            total_delivered_value: 0,
-            value_to_receive: 0,
-            by_truck: {},
-            statistics: { occurrence_count: 0, percentage: 1.0 }
-          }
-        ];
-        setUsers(mockUsers);
-        toast.info('ℹ️ Usando dados de demonstração');
-      } else {
-        toast.error('Falha ao carregar usuários');
-      }
+      setUsers([]);
+      toast.error(error.response?.data?.detail || 'Falha ao carregar usuários');
     }
   };
 
@@ -117,62 +69,17 @@ function AdminDashboard({ user, token, onLogout }) {
 
     setLoadingCommission(true);
     try {
-      // Tenta 3 endpoints em ordem de prioridade
-      let success = false;
       const payload = {
         employee_id: selectedUser.user.id,
         truck_type: commissionData.truck_type,
         value: parseFloat(commissionData.value)
       };
+      await axios.post(`${API}/deliveries`, payload, { timeout: 5000 });
 
-      // 1. Tenta backend local primeiro
-      try {
-        console.log('Tentando backend local...');
-        await axios.post('http://localhost:8000/api/deliveries', payload, { timeout: 2000 });
-        success = true;
-        console.log('✅ Enviado para backend local');
-      } catch (localError) {
-        console.log('❌ Backend local não disponível, tentando remoto...');
-        
-        // 2. Tenta backend remoto
-        try {
-          console.log('Tentando backend remoto...');
-          await axios.post(`${API}/deliveries`, payload, { timeout: 5000 });
-          success = true;
-          console.log('✅ Enviado para backend remoto');
-        } catch (remoteError) {
-          console.log('❌ Backend remoto falhou, usando simualação local...');
-          // 3. Se tudo falhar, simula sucesso localmente
-          success = true;
-        }
-      }
-
-      if (success) {
-        toast.success(`✅ Entrega registrada! R$ ${parseFloat(commissionData.value).toFixed(2)} - ${commissionData.truck_type}`);
-        setCommissionDialogOpen(false);
-        setCommissionData({ value: '', truck_type: 'BKO' });
-        
-        // Atualiza dados localmente mesmo se o backend falhar
-        const updatedUsers = users.map(u => {
-          if (u.user.id === selectedUser.user.id) {
-            const newTotal = (u.total_delivered_value || 0) + parseFloat(commissionData.value);
-            return {
-              ...u,
-              total_delivered_value: newTotal,
-              value_to_receive: newTotal * 0.01, // 1% padrão sem ocorrências
-              by_truck: {
-                ...(u.by_truck || {}),
-                [commissionData.truck_type]: {
-                  count: (u.by_truck?.[commissionData.truck_type]?.count || 0) + 1,
-                  total_value: (u.by_truck?.[commissionData.truck_type]?.total_value || 0) + parseFloat(commissionData.value)
-                }
-              }
-            };
-          }
-          return u;
-        });
-        setUsers(updatedUsers);
-      }
+      toast.success(`✅ Entrega registrada! R$ ${parseFloat(commissionData.value).toFixed(2)} - ${commissionData.truck_type}`);
+      setCommissionDialogOpen(false);
+      setCommissionData({ value: '', truck_type: 'BKO' });
+      await fetchUsers();
     } catch (err) {
       toast.error('❌ Erro: ' + (err.response?.data?.detail || err.message));
     } finally {
@@ -195,50 +102,12 @@ function AdminDashboard({ user, token, onLogout }) {
         description: occurrenceData.description,
         truck_type: occurrenceData.truck_type
       };
+      await axios.post(`${API}/occurrences`, payload, { timeout: 5000 });
 
-      let success = false;
-
-      // 1. Tenta backend local
-      try {
-        console.log('Registrando ocorrência no backend local...');
-        await axios.post('http://localhost:8000/api/occurrences', payload, { timeout: 2000 });
-        success = true;
-        console.log('✅ Ocorrência registrada no backend local');
-      } catch (localError) {
-        console.log('Backend local indisponível, tentando remoto...');
-        
-        // 2. Tenta backend remoto
-        try {
-          console.log('Registrando ocorrência no backend remoto...');
-          await axios.post(`${API}/occurrences`, payload, { timeout: 5000 });
-          success = true;
-          console.log('✅ Ocorrência registrada no backend remoto');
-        } catch (remoteError) {
-          console.log('Backend remoto falhou, simulando localmente...');
-          success = true; // Simula sucesso
-        }
-      }
-
-      if (success) {
-        toast.success(`✅ Ocorrência registrada! ${occurrenceData.truck_type}`);
-        setOccurrenceDialogOpen(false);
-        setOccurrenceData({ type: 'delay', description: '', truck_type: 'BKO' });
-        
-        // Atualiza dados localmente
-        const updatedUsers = users.map(u => {
-          if (u.user.id === selectedUser.user.id) {
-            return {
-              ...u,
-              statistics: {
-                ...u.statistics,
-                occurrence_count: (u.statistics?.occurrence_count || 0) + 1
-              }
-            };
-          }
-          return u;
-        });
-        setUsers(updatedUsers);
-      }
+      toast.success(`✅ Ocorrência registrada! ${occurrenceData.truck_type}`);
+      setOccurrenceDialogOpen(false);
+      setOccurrenceData({ type: 'delay', description: '', truck_type: 'BKO' });
+      await fetchUsers();
     } catch (err) {
       toast.error('❌ Erro: ' + (err.response?.data?.detail || err.message));
     } finally {
@@ -289,10 +158,10 @@ function AdminDashboard({ user, token, onLogout }) {
                   <p className="text-xs text-white/80" data-testid="admin-role">Administrator</p>
                 </div>
               </div>
-              <Button 
-                onClick={onLogout} 
+              <Button
+                onClick={onLogout}
                 data-testid="admin-logout-button"
-                variant="ghost" 
+                variant="ghost"
                 className="text-white hover:bg-white/20"
               >
                 <LogOut className="w-4 h-4 mr-2" />
@@ -306,235 +175,235 @@ function AdminDashboard({ user, token, onLogout }) {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="shadow-xl" data-testid="admin-total-users-card">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-lg font-semibold">Total Users</CardTitle>
-                  <Users className="w-5 h-5 text-blue-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-blue-600" data-testid="admin-total-users">{totalUsers}</div>
-                  <p className="text-sm text-muted-foreground mt-1">Drivers & Helpers</p>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-xl" data-testid="admin-total-deliveries-card">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-lg font-semibold">Total Deliveries</CardTitle>
-                  <img src="/logo.jpg" alt="logo" className="w-5 h-5 object-contain" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-red-600" data-testid="admin-total-deliveries">{totalDeliveries}</div>
-                  <p className="text-sm text-muted-foreground mt-1">All trucks</p>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-xl" data-testid="admin-total-commission-card">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-lg font-semibold">Total Commission</CardTitle>
-                  <DollarSign className="w-5 h-5 text-green-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-green-600" data-testid="admin-total-commission">R$ {totalCommission.toFixed(2)}</div>
-                  <p className="text-sm text-muted-foreground mt-1">All users</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Users Table */}
-            <Card className="shadow-xl">
-              <CardHeader>
-                <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Users & Commissions</CardTitle>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="shadow-xl" data-testid="admin-total-users-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg font-semibold">Total Users</CardTitle>
+                <Users className="w-5 h-5 text-blue-600" />
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full" data-testid="users-table">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-3 px-4 font-semibold">Name</th>
-                        <th className="text-left py-3 px-4 font-semibold">Role</th>
-                        <th className="text-left py-3 px-4 font-semibold">Day</th>
-                        <th className="text-right py-3 px-4 font-semibold whitespace-nowrap">📦 Valor Entregue</th>
-                        <th className="text-right py-3 px-4 font-semibold whitespace-nowrap">💰 Valor a Receber</th>
-                        <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">🚛 Caminhões</th>
-                        <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">⚠️ Ocorrências</th>
-                        <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((userData) => (
-                        <tr key={userData.user.id} className="border-b hover:bg-muted/50" data-testid={`user-row-${userData.user.username}`}>
-                          <td className="py-3 px-4" data-testid={`user-name-${userData.user.username}`}>{userData.user.name}</td>
-                          <td className="py-3 px-4 capitalize" data-testid={`user-role-${userData.user.username}`}>{userData.user.role}</td>
-                          <td className="py-3 px-4 text-sm">{userData.user.assigned_day || '-'}</td>
-                          <td className="py-3 px-4 text-right text-blue-600 font-semibold">
-                            R$ {userData.total_delivered_value ? userData.total_delivered_value.toFixed(2) : '0.00'}
-                          </td>
-                          <td className="py-3 px-4 text-right text-green-600 font-semibold">
-                            R$ {userData.value_to_receive ? userData.value_to_receive.toFixed(2) : '0.00'}
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <div className="flex flex-wrap gap-1 justify-center">
-                              {userData.by_truck && Object.entries(userData.by_truck).map(([truck, data]) => (
-                                <span key={truck} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded" title={`${truck}: R$ ${data.total_value.toFixed(2)}`}>
-                                  {truck}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded text-sm font-semibold">
-                              {userData.statistics?.occurrence_count || 0}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-center">
-                            <div className="flex gap-1 items-center justify-center">
-                              {/* Lançar Comissão */}
-                              <Dialog open={commissionDialogOpen && selectedUser?.user.id === userData.user.id} onOpenChange={(open) => {
-                                setCommissionDialogOpen(open);
-                                if (!open) setSelectedUser(null);
-                              }}>
-                                <DialogTrigger asChild>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={() => { setSelectedUser(userData); setCommissionData({ value: '', truck_type: 'BKO' }); }}
-                                    className="bg-green-600 hover:bg-green-700 px-2 py-1 h-8 text-xs"
-                                    title="Lançar Comissão"
-                                  >
-                                    💰
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent data-testid="launch-commission-dialog">
-                                  <DialogHeader>
-                                    <DialogTitle>Lançar Entrega - {selectedUser?.user.name}</DialogTitle>
-                                    <DialogDescription>
-                                      Registre o valor entregue e selecione o caminhão
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="space-y-4 mt-4">
-                                    <div className="space-y-2">
-                                      <Label>Caminhão</Label>
-                                      <Select value={commissionData.truck_type} onValueChange={(value) => setCommissionData({...commissionData, truck_type: value})}>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Selecione o caminhão" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {TRUCK_TYPES.map(truck => (
-                                            <SelectItem key={truck} value={truck}>
-                                              {truck}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label>Valor Entregue (R$)</Label>
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        placeholder="ex: 5000.00"
-                                        value={commissionData.value}
-                                        onChange={(e) => setCommissionData({...commissionData, value: e.target.value})}
-                                      />
-                                    </div>
-                                    <Button 
-                                      onClick={handleLaunchCommission} 
-                                      disabled={loadingCommission}
-                                      className="w-full bg-green-600 hover:bg-green-700"
-                                    >
-                                      {loadingCommission ? '⏳ Registrando...' : '✅ REGISTRAR ENTREGA'}
-                                    </Button>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
-
-                              {/* Registrar Ocorrência */}
-                              <Dialog open={occurrenceDialogOpen && selectedUser?.user.id === userData.user.id} onOpenChange={(open) => {
-                                setOccurrenceDialogOpen(open);
-                                if (!open) setSelectedUser(null);
-                              }}>
-                                <DialogTrigger asChild>
-                                  <Button 
-                                    size="sm" 
-                                    onClick={() => { setSelectedUser(userData); setOccurrenceData({ type: 'delay', description: '', truck_type: 'BKO' }); }}
-                                    className="bg-orange-600 hover:bg-orange-700 px-2 py-1 h-8 text-xs"
-                                    title="Registrar Ocorrência"
-                                  >
-                                    ⚠️
-                                  </Button>
-                                </DialogTrigger>
-                                <DialogContent data-testid="register-occurrence-dialog">
-                                  <DialogHeader>
-                                    <DialogTitle>Registrar Ocorrência - {selectedUser?.user.name}</DialogTitle>
-                                    <DialogDescription>
-                                      Registre atrasos, danos ou outros problemas
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  <div className="space-y-4 mt-4">
-                                    <div className="space-y-2">
-                                      <Label>Caminhão</Label>
-                                      <Select value={occurrenceData.truck_type} onValueChange={(value) => setOccurrenceData({...occurrenceData, truck_type: value})}>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Selecione o caminhão" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {TRUCK_TYPES.map(truck => (
-                                            <SelectItem key={truck} value={truck}>
-                                              {truck}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label>Tipo de Ocorrência</Label>
-                                      <Select value={occurrenceData.type} onValueChange={(value) => setOccurrenceData({...occurrenceData, type: value})}>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Selecione o tipo" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="delay">🕐 Atraso</SelectItem>
-                                          <SelectItem value="damage">💥 Dano</SelectItem>
-                                          <SelectItem value="accident">🚗 Acidente</SelectItem>
-                                          <SelectItem value="other">❓ Outro</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                    <div className="space-y-2">
-                                      <Label>Descrição</Label>
-                                      <Input
-                                        placeholder="ex: Atraso de 2 horas na entrega"
-                                        value={occurrenceData.description}
-                                        onChange={(e) => setOccurrenceData({...occurrenceData, description: e.target.value})}
-                                      />
-                                    </div>
-                                    <Button 
-                                      onClick={handleRegisterOccurrence} 
-                                      disabled={loadingCommission}
-                                      className="w-full bg-orange-600 hover:bg-orange-700"
-                                    >
-                                      {loadingCommission ? '⏳ Registrando...' : '✅ REGISTRAR'}
-                                    </Button>
-                                  </div>
-                                </DialogContent>
-                              </Dialog>
-
-                              </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {users.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground" data-testid="no-users-message">
-                      No users registered yet
-                    </div>
-                  )}
-                </div>
+                <div className="text-4xl font-bold text-blue-600" data-testid="admin-total-users">{totalUsers}</div>
+                <p className="text-sm text-muted-foreground mt-1">Drivers & Helpers</p>
               </CardContent>
             </Card>
+
+            <Card className="shadow-xl" data-testid="admin-total-deliveries-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg font-semibold">Total Deliveries</CardTitle>
+                <img src="/logo.jpg" alt="logo" className="w-5 h-5 object-contain" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-red-600" data-testid="admin-total-deliveries">{totalDeliveries}</div>
+                <p className="text-sm text-muted-foreground mt-1">All trucks</p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-xl" data-testid="admin-total-commission-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg font-semibold">Total Commission</CardTitle>
+                <DollarSign className="w-5 h-5 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-4xl font-bold text-green-600" data-testid="admin-total-commission">R$ {totalCommission.toFixed(2)}</div>
+                <p className="text-sm text-muted-foreground mt-1">All users</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Users Table */}
+          <Card className="shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Users & Commissions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full" data-testid="users-table">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-3 px-4 font-semibold">Name</th>
+                      <th className="text-left py-3 px-4 font-semibold">Role</th>
+                      <th className="text-left py-3 px-4 font-semibold">Day</th>
+                      <th className="text-right py-3 px-4 font-semibold whitespace-nowrap">📦 Valor Entregue</th>
+                      <th className="text-right py-3 px-4 font-semibold whitespace-nowrap">💰 Valor a Receber</th>
+                      <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">🚛 Caminhões</th>
+                      <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">⚠️ Ocorrências</th>
+                      <th className="text-center py-3 px-4 font-semibold whitespace-nowrap">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((userData) => (
+                      <tr key={userData.user.id} className="border-b hover:bg-muted/50" data-testid={`user-row-${userData.user.username}`}>
+                        <td className="py-3 px-4" data-testid={`user-name-${userData.user.username}`}>{userData.user.name}</td>
+                        <td className="py-3 px-4 capitalize" data-testid={`user-role-${userData.user.username}`}>{userData.user.role}</td>
+                        <td className="py-3 px-4 text-sm">{userData.user.assigned_day || '-'}</td>
+                        <td className="py-3 px-4 text-right text-blue-600 font-semibold">
+                          R$ {userData.total_delivered_value ? userData.total_delivered_value.toFixed(2) : '0.00'}
+                        </td>
+                        <td className="py-3 px-4 text-right text-green-600 font-semibold">
+                          R$ {userData.value_to_receive ? userData.value_to_receive.toFixed(2) : '0.00'}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {userData.by_truck && Object.entries(userData.by_truck).map(([truck, data]) => (
+                              <span key={truck} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded" title={`${truck}: R$ ${data.total_value.toFixed(2)}`}>
+                                {truck}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className="inline-block bg-yellow-100 text-yellow-800 px-3 py-1 rounded text-sm font-semibold">
+                            {userData.statistics?.occurrence_count || 0}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex gap-1 items-center justify-center">
+                            {/* Lançar Comissão */}
+                            <Dialog open={commissionDialogOpen && selectedUser?.user.id === userData.user.id} onOpenChange={(open) => {
+                              setCommissionDialogOpen(open);
+                              if (!open) setSelectedUser(null);
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  onClick={() => { setSelectedUser(userData); setCommissionData({ value: '', truck_type: 'BKO' }); }}
+                                  className="bg-green-600 hover:bg-green-700 px-2 py-1 h-8 text-xs"
+                                  title="Lançar Comissão"
+                                >
+                                  💰
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent data-testid="launch-commission-dialog">
+                                <DialogHeader>
+                                  <DialogTitle>Lançar Entrega - {selectedUser?.user.name}</DialogTitle>
+                                  <DialogDescription>
+                                    Registre o valor entregue e selecione o caminhão
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 mt-4">
+                                  <div className="space-y-2">
+                                    <Label>Caminhão</Label>
+                                    <Select value={commissionData.truck_type} onValueChange={(value) => setCommissionData({ ...commissionData, truck_type: value })}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o caminhão" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {TRUCK_TYPES.map(truck => (
+                                          <SelectItem key={truck} value={truck}>
+                                            {truck}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Valor Entregue (R$)</Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder="ex: 5000.00"
+                                      value={commissionData.value}
+                                      onChange={(e) => setCommissionData({ ...commissionData, value: e.target.value })}
+                                    />
+                                  </div>
+                                  <Button
+                                    onClick={handleLaunchCommission}
+                                    disabled={loadingCommission}
+                                    className="w-full bg-green-600 hover:bg-green-700"
+                                  >
+                                    {loadingCommission ? '⏳ Registrando...' : '✅ REGISTRAR ENTREGA'}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+
+                            {/* Registrar Ocorrência */}
+                            <Dialog open={occurrenceDialogOpen && selectedUser?.user.id === userData.user.id} onOpenChange={(open) => {
+                              setOccurrenceDialogOpen(open);
+                              if (!open) setSelectedUser(null);
+                            }}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  onClick={() => { setSelectedUser(userData); setOccurrenceData({ type: 'delay', description: '', truck_type: 'BKO' }); }}
+                                  className="bg-orange-600 hover:bg-orange-700 px-2 py-1 h-8 text-xs"
+                                  title="Registrar Ocorrência"
+                                >
+                                  ⚠️
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent data-testid="register-occurrence-dialog">
+                                <DialogHeader>
+                                  <DialogTitle>Registrar Ocorrência - {selectedUser?.user.name}</DialogTitle>
+                                  <DialogDescription>
+                                    Registre atrasos, danos ou outros problemas
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 mt-4">
+                                  <div className="space-y-2">
+                                    <Label>Caminhão</Label>
+                                    <Select value={occurrenceData.truck_type} onValueChange={(value) => setOccurrenceData({ ...occurrenceData, truck_type: value })}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o caminhão" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {TRUCK_TYPES.map(truck => (
+                                          <SelectItem key={truck} value={truck}>
+                                            {truck}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Tipo de Ocorrência</Label>
+                                    <Select value={occurrenceData.type} onValueChange={(value) => setOccurrenceData({ ...occurrenceData, type: value })}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Selecione o tipo" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="delay">🕐 Atraso</SelectItem>
+                                        <SelectItem value="damage">💥 Dano</SelectItem>
+                                        <SelectItem value="accident">🚗 Acidente</SelectItem>
+                                        <SelectItem value="other">❓ Outro</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Descrição</Label>
+                                    <Input
+                                      placeholder="ex: Atraso de 2 horas na entrega"
+                                      value={occurrenceData.description}
+                                      onChange={(e) => setOccurrenceData({ ...occurrenceData, description: e.target.value })}
+                                    />
+                                  </div>
+                                  <Button
+                                    onClick={handleRegisterOccurrence}
+                                    disabled={loadingCommission}
+                                    className="w-full bg-orange-600 hover:bg-orange-700"
+                                  >
+                                    {loadingCommission ? '⏳ Registrando...' : '✅ REGISTRAR'}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {users.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="no-users-message">
+                    No users registered yet
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </main>
     </div>
