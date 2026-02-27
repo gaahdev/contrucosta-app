@@ -638,10 +638,10 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
         else:
             percentage = 1.0
         
-        # Calcula valor a receber
-        value_to_receive = total_delivered * percentage
+        # Calcula valor a receber (percentual de comissão)
+        value_to_receive = total_delivered * (percentage / 100)
         
-        logger.info(f"  👤 {user_data['name']}: {len(deliveries)} entregas (R${total_delivered:.2f}), {occurrence_count} ocorrências, {percentage*100:.0f}% comissão")
+        logger.info(f"  👤 {user_data['name']}: {len(deliveries)} entregas (R${total_delivered:.2f}), {occurrence_count} ocorrências, {percentage:.1f}% comissão")
         
         result.append({
             "user": {
@@ -693,8 +693,8 @@ async def get_employee_summary(employee_id: str):
     else:
         percentage = 1.0
     
-    # Calcula valor a receber
-    value_to_receive = total_delivered * percentage
+    # Calcula valor a receber (percentual de comissão)
+    value_to_receive = total_delivered * (percentage / 100)
     
     # Busca dados do usuário
     user = await db.users.find_one({"id": employee_id}, {"_id": 0, "password": 0})

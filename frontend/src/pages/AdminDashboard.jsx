@@ -241,7 +241,10 @@ function AdminDashboard({ user, token, onLogout }) {
                           R$ {userData.total_delivered_value ? userData.total_delivered_value.toFixed(2) : '0.00'}
                         </td>
                         <td className="py-3 px-4 text-right text-green-600 font-semibold">
-                          R$ {userData.value_to_receive ? userData.value_to_receive.toFixed(2) : '0.00'}
+                          <div>R$ {userData.value_to_receive ? userData.value_to_receive.toFixed(2) : '0.00'}</div>
+                          <div className="text-xs text-muted-foreground font-normal">
+                            {userData.statistics?.percentage?.toFixed(1) || '1.0'}%
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-wrap gap-1 justify-center">
