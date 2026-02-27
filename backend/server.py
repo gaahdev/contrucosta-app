@@ -541,44 +541,7 @@ async def get_all_users(admin: User = Depends(get_admin_user)):
     
     return result
 
-@api_router.post("/admin/delivery")
-async def update_delivery(delivery_update: DeliveryUpdate, admin: User = Depends(get_admin_user)):
-    # Validate truck type
-    if delivery_update.truck_type not in TRUCK_RATES:
-        raise HTTPException(status_code=400, detail="Invalid truck type")
-    
-    # Check if user exists
-    user = await db.users.find_one({"id": delivery_update.user_id})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Update or create delivery record
-    existing = await db.deliveries.find_one({
-        "user_id": delivery_update.user_id,
-        "truck_type": delivery_update.truck_type
-    })
-    
-    if existing:
-        await db.deliveries.update_one(
-            {"id": existing['id']},
-            {"$set": {
-                "delivery_count": delivery_update.delivery_count,
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }}
-        )
-    else:
-        delivery = DeliveryRecord(
-            user_id=delivery_update.user_id,
-            truck_type=delivery_update.truck_type,
-            delivery_count=delivery_update.delivery_count
-        )
-        delivery_doc = delivery.model_dump()
-        delivery_doc['updated_at'] = delivery_doc['updated_at'].isoformat()
-        await db.deliveries.insert_one(delivery_doc)
-    
-    return {"message": "Delivery updated successfully"}
-
-@api_router.get("/admin/user/{user_id}/deliveries")
+# Remover endpoint antigo @api_router.post("/admin/delivery") - usar /api/deliveries em vez disso@api_router.get("/admin/user/{user_id}/deliveries")
 async def get_user_deliveries(user_id: str, admin: User = Depends(get_admin_user)):
     deliveries = await db.deliveries.find({"user_id": user_id}, {"_id": 0}).to_list(100)
     return deliveries
