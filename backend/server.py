@@ -316,20 +316,59 @@ def can_fill_checklist(user: User) -> bool:
     # Allow filling on the assigned day or any day after it within the same week
     return current_day_index >= assigned_day_index
 
-def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int]) -> float:
+def is_special_member(employee_name: Optional[str]) -> bool:
+    if not employee_name:
+        return False
+    return employee_name.strip().lower() == "valdiney"
+
+def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], employee_name: Optional[str] = None) -> float:
     """Calcula percentual por tier de ocorrências.
 
-    Regras:
+    Regras padrão:
     - Mais ocorrências: 0.8%
     - Ocorrências medianas: 0.9%
     - Menos ocorrências: 1.0%
     - Se todos tiverem 0 ocorrências: 1.0% para todos
+
+    Regras especiais Valdiney:
+    - Faixa entre 2.0% e 2.5%
+    - Pior cenário: 2.0%
+    - Médio: 2.25%
+    - Melhor cenário: 2.5%
     """
+    is_valdiney = is_special_member(employee_name)
+    min_rate = 2.0 if is_valdiney else 0.8
+    mid_rate = 2.25 if is_valdiney else 0.9
+    max_rate = 2.5 if is_valdiney else 1.0
+
     if not occurrence_counts:
-        return 1.0
+        return max_rate
 
     if all(count == 0 for count in occurrence_counts.values()):
-        return 1.0
+        return max_rate
+
+    members_with_occurrence = [
+        (emp_id, count) for emp_id, count in occurrence_counts.items() if count > 0
+    ]
+    members_with_occurrence.sort(key=lambda item: item[1], reverse=True)
+
+    # Regra específica: apenas 1 membro com ocorrência -> só ele recebe a menor taxa
+    if len(members_with_occurrence) == 1:
+        return min_rate if employee_id == members_with_occurrence[0][0] else max_rate
+
+    # Regra específica: 2 membros com ocorrência -> maior recebe menor taxa, menor recebe taxa média, restante taxa máxima
+    if len(members_with_occurrence) == 2:
+        first_id = members_with_occurrence[0][0]
+        second_id = members_with_occurrence[1][0]
+        first_count = members_with_occurrence[0][1]
+        second_count = members_with_occurrence[1][1]
+        if first_count == second_count and employee_id in {first_id, second_id}:
+            return mid_rate
+        if employee_id == first_id:
+            return min_rate
+        if employee_id == second_id:
+            return mid_rate
+        return max_rate
 
     sorted_employees = sorted(
         occurrence_counts.items(),
@@ -344,10 +383,10 @@ def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int]) -> 
     tier_size = total / 3
 
     if position < tier_size:
-        return 0.8
+        return min_rate
     if position < tier_size * 2:
-        return 0.9
-    return 1.0
+        return mid_rate
+    return max_rate
 
 async def get_occurrence_count_map() -> Dict[str, int]:
     """Retorna mapa employee_id -> quantidade de ocorrências para todos os membros."""
@@ -679,7 +718,7 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
         
         # Conta ocorrências e calcula percentual por tier
         occurrence_count = occurrence_counts.get(user_id, 0)
-        percentage = get_tier_percentage(user_id, occurrence_counts)
+        percentage = get_tier_percentage(user_id, occurrence_counts, user_data.get("name"))
         
         # Calcula valor a receber (percentual de comissão)
         value_to_receive = total_delivered * (percentage / 100)
@@ -724,6 +763,10 @@ async def get_employee_summary(employee_id: str):
             by_truck[truck]["count"] += 1
             by_truck[truck]["total_value"] += d.get("value", 0)
     
+    # Busca dados do usuário
+    user = await db.users.find_one({"id": employee_id}, {"_id": 0, "password": 0})
+    user_name = user.get("name", f"Funcionário {employee_id}") if user else f"Funcionário {employee_id}"
+
     # Busca ocorrências detalhadas
     occurrences = await db.occurrences.find(
         {"employee_id": employee_id},
@@ -733,14 +776,10 @@ async def get_employee_summary(employee_id: str):
 
     # Calcula percentual por tier (comparando com todos os membros)
     occurrence_counts = await get_occurrence_count_map()
-    percentage = get_tier_percentage(employee_id, occurrence_counts)
+    percentage = get_tier_percentage(employee_id, occurrence_counts, user_name)
     
     # Calcula valor a receber (percentual de comissão)
     value_to_receive = total_delivered * (percentage / 100)
-    
-    # Busca dados do usuário
-    user = await db.users.find_one({"id": employee_id}, {"_id": 0, "password": 0})
-    user_name = user.get("name", f"Funcionário {employee_id}") if user else f"Funcionário {employee_id}"
     
     return {
         "employee_id": employee_id,
