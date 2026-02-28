@@ -122,6 +122,9 @@ function UserDashboard({ user, token, onLogout }) {
                     R$ {employeeSummary.total_delivered_value?.toFixed(2) || '0.00'}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">Valor de todas as entregas</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Hoje: R$ {employeeSummary.today_delivered_value?.toFixed(2) || '0.00'}
+                  </p>
                 </CardContent>
               </Card>
 

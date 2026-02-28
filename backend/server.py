@@ -434,12 +434,18 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
     occurrence_counts = await get_occurrence_count_map()
     
     result = []
+    today_iso = datetime.now(timezone.utc).date().isoformat()
     for user_data in users:
         user_id = user_data["id"]
         
         # Busca entregas
         deliveries = await db.deliveries.find({"employee_id": user_id}, {"_id": 0}).to_list(1000)
         total_delivered = sum(d.get("value", 0) for d in deliveries)
+        today_delivered_value = sum(
+            d.get("value", 0)
+            for d in deliveries
+            if str(d.get("created_at", "")).startswith(today_iso)
+        )
         
         # Agrupa por caminhão
         by_truck = {}
@@ -471,6 +477,7 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
             "total_deliveries": len(deliveries),
             "total_commission": round(value_to_receive, 2),
             "total_delivered_value": round(total_delivered, 2),
+            "today_delivered_value": round(today_delivered_value, 2),
             "value_to_receive": round(value_to_receive, 2),
             "by_truck": by_truck,
             "statistics": {
@@ -487,6 +494,12 @@ async def get_employee_summary(employee_id: str):
     # Busca entregas
     deliveries = await db.deliveries.find({"employee_id": employee_id}, {"_id": 0}).to_list(1000)
     total_delivered = sum(d.get("value", 0) for d in deliveries)
+    today_iso = datetime.now(timezone.utc).date().isoformat()
+    today_delivered_value = sum(
+        d.get("value", 0)
+        for d in deliveries
+        if str(d.get("created_at", "")).startswith(today_iso)
+    )
     
     # Agrupa por caminhão
     by_truck = {}
@@ -520,6 +533,7 @@ async def get_employee_summary(employee_id: str):
         "employee_id": employee_id,
         "name": user_name,
         "total_delivered_value": round(total_delivered, 2),
+        "today_delivered_value": round(today_delivered_value, 2),
         "value_to_receive": round(value_to_receive, 2),
         "by_truck": by_truck,
         "occurrence_count": occurrence_count,

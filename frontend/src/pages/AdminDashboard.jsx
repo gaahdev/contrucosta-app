@@ -133,6 +133,7 @@ function AdminDashboard({ user, token, onLogout }) {
   const totalUsers = users.length;
   const totalCommission = users.reduce((sum, u) => sum + u.total_commission, 0);
   const totalDeliveries = users.reduce((sum, u) => sum + u.total_deliveries, 0);
+  const totalTodayDelivered = users.reduce((sum, u) => sum + (u.today_delivered_value || 0), 0);
 
   return (
     <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #660000 0%, #0b0b0b 100%)' }}>
@@ -196,6 +197,7 @@ function AdminDashboard({ user, token, onLogout }) {
               <CardContent>
                 <div className="text-4xl font-bold text-red-600" data-testid="admin-total-deliveries">{totalDeliveries}</div>
                 <p className="text-sm text-muted-foreground mt-1">All trucks</p>
+                <p className="text-xs text-muted-foreground mt-1">Hoje: R$ {totalTodayDelivered.toFixed(2)}</p>
               </CardContent>
             </Card>
 
@@ -238,7 +240,10 @@ function AdminDashboard({ user, token, onLogout }) {
                         <td className="py-3 px-4 capitalize" data-testid={`user-role-${userData.user.username}`}>{userData.user.role}</td>
                         <td className="py-3 px-4 text-sm">{userData.user.assigned_day || '-'}</td>
                         <td className="py-3 px-4 text-right text-blue-600 font-semibold">
-                          R$ {userData.total_delivered_value ? userData.total_delivered_value.toFixed(2) : '0.00'}
+                          <div>R$ {userData.total_delivered_value ? userData.total_delivered_value.toFixed(2) : '0.00'}</div>
+                          <div className="text-xs text-muted-foreground font-normal">
+                            Hoje: R$ {userData.today_delivered_value ? userData.today_delivered_value.toFixed(2) : '0.00'}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-right text-green-600 font-semibold">
                           <div>R$ {userData.value_to_receive ? userData.value_to_receive.toFixed(2) : '0.00'}</div>
