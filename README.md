@@ -18,3 +18,25 @@ Este projeto usa React (CRA). A forma mais rápida de gerar APK é com Capacitor
 ### Observações
 - O backend já está configurado no arquivo [.env](frontend/.env).
 - Se precisar trocar o backend, altere `REACT_APP_BACKEND_URL` e refaça o build.
+
+## Notificações Push (APK Android)
+
+Para que o usuário receba notificação quando a comissão/entrega for lançada:
+
+1. Firebase no app Android
+	- Crie um projeto no Firebase e adicione app Android com package `com.contrucosta.app`.
+	- Baixe o `google-services.json` e coloque em `frontend/android/app/google-services.json`.
+
+2. Credencial do Firebase no backend
+	- Gere uma Service Account no Firebase (JSON).
+	- Configure no backend uma destas variáveis:
+	  - `FIREBASE_SERVICE_ACCOUNT_JSON` (conteúdo JSON em string), ou
+	  - `FIREBASE_SERVICE_ACCOUNT_FILE` (caminho para o arquivo JSON).
+
+3. Build/sync do Capacitor
+	- No frontend, rode `yarn install` (inclui `@capacitor/push-notifications`).
+	- Rode `npx cap sync android` antes do build do APK.
+
+4. Fluxo de uso
+	- Usuário faz login no APK -> token push é registrado no backend.
+	- Admin lança comissão/entrega -> backend envia push para o usuário alvo.

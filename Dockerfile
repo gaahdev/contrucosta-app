@@ -32,12 +32,14 @@ RUN mkdir -p ${ANDROID_SDK_ROOT}/licenses && \
 
 # Install SDK components
 RUN yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install \
+    "platforms;android-33" \
     "platforms;android-34" \
+    "build-tools;33.0.2" \
     "build-tools;34.0.0" \
     "platform-tools" || true
 
 # Install Node.js
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     npm install -g yarn
 
@@ -47,16 +49,17 @@ COPY . /app
 
 # Build the frontend web
 RUN cd /app/frontend && \
-    yarn install && \
+    yarn install --ignore-engines && \
     yarn build && \
-    npx cap copy android
+    npx cap sync android
 
 # Compile APK
 RUN cd /app/frontend/android && \
     chmod +x gradlew && \
-    ./gradlew assembleDebug --no-daemon
+    ./gradlew assembleRelease --no-daemon
 
 # Copy output APK
-RUN cp /app/frontend/android/app/build/outputs/apk/debug/app-debug.apk /app/app-debug.apk || true
+RUN cp /app/frontend/android/app/build/outputs/apk/release/app-release.apk /app/app-release.apk || \
+    cp /app/frontend/android/app/build/outputs/apk/release/app-release-unsigned.apk /app/app-release-unsigned.apk || true
 
 CMD ["/bin/bash"]

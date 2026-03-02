@@ -15,6 +15,7 @@ import jwt
 
 # Import commission routes
 from commission_routes import create_commission_router
+from push_notifications import notify_commission_update, register_device_token
 
 ROOT_DIR = Path(__file__).parent
 # Carregar .env local se existir
@@ -122,6 +123,11 @@ class AdminUserSummary(BaseModel):
     user: User
     total_deliveries: int
     total_commission: float
+
+
+class DeviceTokenRegister(BaseModel):
+    token: str
+    platform: str = "android"
 
 # Helper functions
 def hash_password(password: str) -> str:
@@ -347,6 +353,35 @@ async def login(credentials: UserLogin):
     user_obj = User(**user)
     return {"token": token, "user": user_obj}
 
+
+@api_router.post("/notifications/token")
+async def register_notification_token(
+    payload: DeviceTokenRegister,
+    current_user: User = Depends(get_current_user),
+):
+    await register_device_token(
+        db=db,
+        employee_id=current_user.id,
+        employee_name=current_user.name,
+        role=current_user.role,
+        token=payload.token,
+        platform=payload.platform,
+    )
+    return {"success": True}
+
+
+@api_router.get("/notifications/me")
+async def get_my_notifications(
+    current_user: User = Depends(get_current_user),
+    limit: int = 50,
+):
+    safe_limit = max(1, min(limit, 100))
+    notifications = await db.notifications.find(
+        {"employee_id": current_user.id},
+        {"_id": 0},
+    ).sort("timestamp", -1).to_list(safe_limit)
+    return {"notifications": notifications, "total": len(notifications)}
+
 @api_router.get("/user/dashboard", response_model=UserDashboard)
 async def get_user_dashboard(current_user: User = Depends(get_current_user)):
     commission_data = await calculate_user_commission(current_user.id)
@@ -397,10 +432,23 @@ async def create_delivery(payload: DeliveryCreate):
     delivery_doc = delivery.copy()
     result = await db.deliveries.insert_one(delivery_doc)
     logger.info(f"✅ Entrega inserida no MongoDB: {payload.employee_id} - {payload.truck_type} - R${payload.value} (ID: {result.inserted_id})")
+
+    employee = await db.users.find_one({"id": payload.employee_id}, {"_id": 0, "name": 1})
+    employee_name = employee.get("name", f"Funcionário {payload.employee_id}") if employee else f"Funcionário {payload.employee_id}"
+    push_result = await notify_commission_update(
+        db=db,
+        employee_id=payload.employee_id,
+        employee_name=employee_name,
+        amount=payload.value,
+        truck_type=payload.truck_type,
+    )
+
     return {
         "success": True,
         "delivery": delivery,
-        "inserted_id": str(result.inserted_id)
+        "inserted_id": str(result.inserted_id),
+        "notification_sent": push_result.get("sent", 0) > 0,
+        "notification_result": push_result,
     }
 
 @api_router.post("/occurrences")

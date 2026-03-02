@@ -1137,6 +1137,11 @@
   dependencies:
     tslib "^2.1.0"
 
+"@capacitor/push-notifications@^5.0.0":
+  version "5.1.2"
+  resolved "https://registry.yarnpkg.com/@capacitor/push-notifications/-/push-notifications-5.1.2.tgz#7f50e3bd2f215ea161dce8ff1824f815f8d45cdc"
+  integrity sha512-l5kz/8B2oszi1ciJzOKfkhb6jSlYTs8OpjozV/ey+xcUVnYDTBWpDBUi66ZfPDFoZC/G7srIazR7Le+JJAoNUQ==
+
 "@craco/craco@^7.1.0":
   version "7.1.0"
   resolved "https://registry.npmjs.org/@craco/craco/-/craco-7.1.0.tgz"

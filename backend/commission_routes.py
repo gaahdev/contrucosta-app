@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import List, Optional, Dict
 import uuid
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from push_notifications import notify_commission_update
 
 # Models
 class OccurrenceRecord(BaseModel):
@@ -383,24 +384,14 @@ async def send_commission_notification(db: AsyncIOMotorDatabase, employee_id: st
     - Push notification para Android/iOS
     - Email para administrador
     """
-    notification = {
-        "id": str(uuid.uuid4()),
-        "employee_id": employee_id,
-        "employee_name": employee_name,
-        "type": "commission_posted",
-        "title": "💰 Nova Comissão Lançada",
-        "message": f"Sua comissão de R$ {commission_amount:.2f} ({percentage}%) foi registrada no sistema",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "read": False,
-        "data": {
-            "commission_amount": commission_amount,
-            "percentage": percentage
-        }
-    }
-    
-    try:
-        await db.notifications.insert_one(notification)
-    except Exception as e:
-        print(f"Error saving notification: {e}")
-    
-    print(f"[NOTIFICATION] {employee_name}: Comissão de R$ {commission_amount:.2f} lançada")
+    result = await notify_commission_update(
+        db=db,
+        employee_id=employee_id,
+        employee_name=employee_name,
+        amount=commission_amount,
+        percentage=percentage,
+    )
+    print(
+        f"[NOTIFICATION] {employee_name}: Comissão de R$ {commission_amount:.2f} lançada "
+        f"(sent={result.get('sent', 0)}, failed={result.get('failed', 0)})"
+    )

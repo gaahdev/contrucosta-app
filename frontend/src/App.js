@@ -5,6 +5,8 @@ import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
+import { initializePushNotifications } from './services/pushNotificationService';
 import './App.css';
 
 function App() {
@@ -19,6 +21,36 @@ function App() {
       setToken(storedToken);
     }
   }, []);
+
+  useEffect(() => {
+    let cleanup = null;
+    let cancelled = false;
+
+    const setupPush = async () => {
+      if (!user || !token) return;
+
+      const cleanupFn = await initializePushNotifications({
+        user,
+        authToken: token,
+        onNotification: (notification) => {
+          toast.success(notification?.title || 'Nova notificação', {
+            description: notification?.body || notification?.data?.message || 'Você recebeu uma atualização.',
+          });
+        },
+      });
+
+      if (!cancelled) {
+        cleanup = cleanupFn;
+      }
+    };
+
+    setupPush();
+
+    return () => {
+      cancelled = true;
+      if (cleanup) cleanup();
+    };
+  }, [user, token]);
 
   const handleLogin = (userData, authToken) => {
     setUser(userData);
