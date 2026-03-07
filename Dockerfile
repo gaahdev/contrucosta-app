@@ -32,8 +32,10 @@ RUN mkdir -p ${ANDROID_SDK_ROOT}/licenses && \
 
 # Install SDK components
 RUN yes | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager --install \
+    "platforms;android-30" \
     "platforms;android-33" \
     "platforms;android-34" \
+    "build-tools;30.0.3" \
     "build-tools;33.0.2" \
     "build-tools;34.0.0" \
     "platform-tools" || true

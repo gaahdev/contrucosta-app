@@ -6,7 +6,7 @@
   "homepage": "./",
   "author": "Contrucosta",
   "build": {
-    "appId": "com.contrucosta.app",
+    "appId": "com.construcosta.app",
     "productName": "Contrucosta App",
     "files": [
       "build/**/*",

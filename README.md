@@ -36,6 +36,7 @@ Para que o usuário receba notificação quando a comissão/entrega for lançada
 3. Build/sync do Capacitor
 	- No frontend, rode `yarn install` (inclui `@capacitor/push-notifications`).
 	- Rode `npx cap sync android` antes do build do APK.
+	- Ative push no app com `REACT_APP_ENABLE_PUSH_NOTIFICATIONS=true` apenas depois de configurar `google-services.json` e credenciais Firebase no backend.
 
 4. Fluxo de uso
 	- Usuário faz login no APK -> token push é registrado no backend.

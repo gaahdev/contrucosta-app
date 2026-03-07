@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Contrucosta</string>
     <string name="title_activity_main">Contrucosta</string>
-    <string name="package_name">com.contrucosta.app</string>
-    <string name="custom_url_scheme">com.contrucosta.app</string>
+    <string name="package_name">com.construcosta.app</string>
+    <string name="custom_url_scheme">com.construcosta.app</string>
 </resources>

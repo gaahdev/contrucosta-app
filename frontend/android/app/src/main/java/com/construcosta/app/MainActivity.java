@@ -1,4 +1,4 @@
-package com.contrucosta.app;
+package com.construcosta.app;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -8,7 +8,7 @@
   "homepage": "./",
   "private": true,
   "build": {
-    "appId": "com.contrucosta.app",
+    "appId": "com.construcosta.app",
     "productName": "Contrucosta App",
     "files": [
       "build/**/*",
@@ -107,7 +107,7 @@
     "test": "craco test",
     "electron-dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
     "electron-build": "npm run build && electron-builder --win --publish=never",
-    "cap:init": "cap init ContrucostaApp com.contrucosta.app --web-dir build",
+    "cap:init": "cap init ContrucostaApp com.construcosta.app --web-dir build",
     "cap:add-android": "cap add android",
     "cap:copy": "cap copy",
     "cap:open-android": "cap open android"

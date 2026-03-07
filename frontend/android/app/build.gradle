@@ -7,10 +7,10 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace "com.contrucosta.app"
+    namespace "com.construcosta.app"
     compileSdk 33
     defaultConfig {
-        applicationId "com.contrucosta.app"
+        applicationId "com.construcosta.app"
         minSdkVersion 24
         targetSdkVersion 33
         versionCode 2

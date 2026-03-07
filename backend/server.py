@@ -7,7 +7,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
@@ -195,6 +195,21 @@ def is_special_member(employee_name: Optional[str]) -> bool:
         return False
     return employee_name.strip().lower() == "valdiney"
 
+
+def is_month_closed(month: int, year: int) -> bool:
+    """Retorna True quando o mês já encerrou."""
+    now = datetime.now(timezone.utc)
+    return (year < now.year) or (year == now.year and month < now.month)
+
+
+def parse_iso_datetime(value: str) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
 def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], employee_name: Optional[str] = None) -> float:
     """Calcula percentual por tier de ocorrências.
 
@@ -277,6 +292,65 @@ async def get_occurrence_count_map() -> Dict[str, int]:
         occurrence_counts[employee_id] = await db.occurrences.count_documents({"employee_id": employee_id})
 
     return occurrence_counts
+
+
+async def get_occurrence_count_map_for_period(month: int, year: int) -> Dict[str, int]:
+    """Mapa employee_id -> ocorrências apenas do mês/ano informado."""
+    users = await db.users.find(
+        {"role": {"$in": ["driver", "helper"]}},
+        {"_id": 0, "id": 1}
+    ).to_list(1000)
+
+    period_prefix = f"{year:04d}-{month:02d}"
+    occurrence_counts: Dict[str, int] = {}
+
+    for user in users:
+        employee_id = user.get("id")
+        if not employee_id:
+            continue
+        occurrence_counts[employee_id] = await db.occurrences.count_documents(
+            {
+                "employee_id": employee_id,
+                "created_at": {"$regex": f"^{period_prefix}"},
+            }
+        )
+
+    return occurrence_counts
+
+
+def get_monthly_percentage(
+    employee_id: str,
+    employee_name: Optional[str],
+    occurrence_counts: Dict[str, int],
+    month: int,
+    year: int,
+) -> float:
+    """
+    Regra mensal solicitada:
+    - Durante o mês: todos (exceto Valdiney) ficam em 0.8%
+    - Fechamento do mês: ranking por ocorrências (mais=0.8, meio=0.9, menos=1.0)
+    - Valdiney mantém regra especial já existente
+    """
+    if is_special_member(employee_name):
+        return get_tier_percentage(employee_id, occurrence_counts, employee_name)
+
+    if not is_month_closed(month, year):
+        return 0.8
+
+    return get_tier_percentage(employee_id, occurrence_counts, employee_name)
+
+
+def get_delivery_values_for_period(deliveries: List[dict], month: int, year: int) -> Tuple[float, float]:
+    """Retorna total geral e total do mês/ano informado para uma lista de entregas."""
+    total_all_time = sum(d.get("value", 0) for d in deliveries)
+    total_period = 0.0
+
+    for delivery in deliveries:
+        dt = parse_iso_datetime(str(delivery.get("created_at", "")))
+        if dt and dt.month == month and dt.year == year:
+            total_period += float(delivery.get("value", 0))
+
+    return total_all_time, total_period
 
 # Calculate commission for a user
 async def calculate_user_commission(user_id: str) -> dict:
@@ -479,7 +553,10 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
     users = await db.users.find({"role": {"$in": ["driver", "helper"]}}, {"_id": 0, "password": 0}).to_list(1000)
     logger.info(f"📋 Buscando dados de {len(users)} usuários do MongoDB")
 
-    occurrence_counts = await get_occurrence_count_map()
+    now = datetime.now(timezone.utc)
+    month = now.month
+    year = now.year
+    occurrence_counts = await get_occurrence_count_map_for_period(month, year)
     
     result = []
     today_iso = datetime.now(timezone.utc).date().isoformat()
@@ -488,7 +565,7 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
         
         # Busca entregas
         deliveries = await db.deliveries.find({"employee_id": user_id}, {"_id": 0}).to_list(1000)
-        total_delivered = sum(d.get("value", 0) for d in deliveries)
+        total_delivered, month_delivered = get_delivery_values_for_period(deliveries, month, year)
         today_delivered_value = sum(
             d.get("value", 0)
             for d in deliveries
@@ -507,12 +584,16 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
         
         # Conta ocorrências e calcula percentual por tier
         occurrence_count = occurrence_counts.get(user_id, 0)
-        percentage = get_tier_percentage(user_id, occurrence_counts, user_data.get("name"))
+        percentage = get_monthly_percentage(user_id, user_data.get("name"), occurrence_counts, month, year)
         
-        # Calcula valor a receber (percentual de comissão)
-        value_to_receive = total_delivered * (percentage / 100)
+        # Calcula valor a receber com base no mês atual
+        value_to_receive = month_delivered * (percentage / 100)
         
-        logger.info(f"  👤 {user_data['name']}: {len(deliveries)} entregas (R${total_delivered:.2f}), {occurrence_count} ocorrências, {percentage:.1f}% comissão")
+        logger.info(
+            f"  👤 {user_data['name']}: {len(deliveries)} entregas "
+            f"(mês R${month_delivered:.2f}, total R${total_delivered:.2f}), "
+            f"{occurrence_count} ocorrências no mês, {percentage:.1f}% comissão"
+        )
         
         result.append({
             "user": {
@@ -524,13 +605,17 @@ async def get_admin_users_new(admin: User = Depends(get_admin_user)):
             },
             "total_deliveries": len(deliveries),
             "total_commission": round(value_to_receive, 2),
-            "total_delivered_value": round(total_delivered, 2),
+            "total_delivered_value": round(month_delivered, 2),
+            "all_time_delivered_value": round(total_delivered, 2),
             "today_delivered_value": round(today_delivered_value, 2),
             "value_to_receive": round(value_to_receive, 2),
             "by_truck": by_truck,
             "statistics": {
                 "occurrence_count": occurrence_count,
-                "percentage": percentage
+                "percentage": percentage,
+                "month": month,
+                "year": year,
+                "status": "closed" if is_month_closed(month, year) else "provisional"
             }
         })
     
@@ -541,7 +626,10 @@ async def get_employee_summary(employee_id: str):
     """Retorna resumo de entrega de um motorista"""
     # Busca entregas
     deliveries = await db.deliveries.find({"employee_id": employee_id}, {"_id": 0}).to_list(1000)
-    total_delivered = sum(d.get("value", 0) for d in deliveries)
+    now = datetime.now(timezone.utc)
+    month = now.month
+    year = now.year
+    total_delivered, month_delivered = get_delivery_values_for_period(deliveries, month, year)
     today_iso = datetime.now(timezone.utc).date().isoformat()
     today_delivered_value = sum(
         d.get("value", 0)
@@ -568,25 +656,97 @@ async def get_employee_summary(employee_id: str):
         {"employee_id": employee_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(200)
-    occurrence_count = len(occurrences)
+    occurrence_count = 0
+    for occurrence in occurrences:
+        dt = parse_iso_datetime(str(occurrence.get("created_at", "")))
+        if dt and dt.month == month and dt.year == year:
+            occurrence_count += 1
 
     # Calcula percentual por tier (comparando com todos os membros)
-    occurrence_counts = await get_occurrence_count_map()
-    percentage = get_tier_percentage(employee_id, occurrence_counts, user_name)
+    occurrence_counts = await get_occurrence_count_map_for_period(month, year)
+    percentage = get_monthly_percentage(employee_id, user_name, occurrence_counts, month, year)
     
-    # Calcula valor a receber (percentual de comissão)
-    value_to_receive = total_delivered * (percentage / 100)
+    # Calcula valor a receber no mês atual
+    value_to_receive = month_delivered * (percentage / 100)
     
     return {
         "employee_id": employee_id,
         "name": user_name,
-        "total_delivered_value": round(total_delivered, 2),
+        "total_delivered_value": round(month_delivered, 2),
+        "all_time_delivered_value": round(total_delivered, 2),
         "today_delivered_value": round(today_delivered_value, 2),
         "value_to_receive": round(value_to_receive, 2),
         "by_truck": by_truck,
         "occurrence_count": occurrence_count,
         "percentage": percentage,
+        "month": month,
+        "year": year,
+        "status": "closed" if is_month_closed(month, year) else "provisional",
         "occurrences": occurrences
+    }
+
+
+@api_router.get("/reports/monthly-commission")
+async def get_monthly_commission_report(
+    month: int,
+    year: int,
+    admin: User = Depends(get_admin_user),
+):
+    """Gera relatório mensal de comissão por ranking de ocorrências."""
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    users = await db.users.find(
+        {"role": {"$in": ["driver", "helper"]}},
+        {"_id": 0, "password": 0}
+    ).to_list(1000)
+
+    occurrence_counts = await get_occurrence_count_map_for_period(month, year)
+    report_rows = []
+
+    for user_data in users:
+        user_id = user_data["id"]
+        name = user_data.get("name")
+        deliveries = await db.deliveries.find({"employee_id": user_id}, {"_id": 0}).to_list(5000)
+        _, month_delivered = get_delivery_values_for_period(deliveries, month, year)
+
+        percentage = get_monthly_percentage(user_id, name, occurrence_counts, month, year)
+        commission_value = month_delivered * (percentage / 100)
+
+        report_rows.append({
+            "employee_id": user_id,
+            "employee_name": name,
+            "role": user_data.get("role"),
+            "occurrence_count": occurrence_counts.get(user_id, 0),
+            "monthly_delivered_value": round(month_delivered, 2),
+            "percentage": round(percentage, 2),
+            "commission_value": round(commission_value, 2),
+        })
+
+    report_rows.sort(key=lambda row: (row["occurrence_count"], -row["monthly_delivered_value"]))
+
+    total_delivered = round(sum(row["monthly_delivered_value"] for row in report_rows), 2)
+    total_commission = round(sum(row["commission_value"] for row in report_rows), 2)
+
+    return {
+        "month": month,
+        "year": year,
+        "status": "closed" if is_month_closed(month, year) else "provisional",
+        "policy": {
+            "default_rate_during_month": 0.8,
+            "closing_rates": {
+                "fewer_occurrences": 1.0,
+                "middle": 0.9,
+                "more_occurrences": 0.8,
+            },
+            "special_member": "Valdiney",
+        },
+        "summary": {
+            "employees": len(report_rows),
+            "total_delivered_value": total_delivered,
+            "total_commission_value": total_commission,
+        },
+        "rows": report_rows,
     }
 
 app.include_router(api_router)

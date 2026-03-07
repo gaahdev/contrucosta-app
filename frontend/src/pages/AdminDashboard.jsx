@@ -25,6 +25,7 @@ const TRUCK_RATES = {
 };
 
 function AdminDashboard({ user, token, onLogout }) {
+  const now = new Date();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -33,6 +34,10 @@ function AdminDashboard({ user, token, onLogout }) {
   const [commissionData, setCommissionData] = useState({ value: '', truck_type: 'BKO' });
   const [occurrenceData, setOccurrenceData] = useState({ type: 'delay', description: '', truck_type: 'BKO' });
   const [loadingCommission, setLoadingCommission] = useState(false);
+  const [reportMonth, setReportMonth] = useState(String(now.getMonth() + 1));
+  const [reportYear, setReportYear] = useState(String(now.getFullYear()));
+  const [monthlyReport, setMonthlyReport] = useState(null);
+  const [loadingReport, setLoadingReport] = useState(false);
 
   const navigate = useNavigate();
 
@@ -51,9 +56,30 @@ function AdminDashboard({ user, token, onLogout }) {
     }
   };
 
+  const fetchMonthlyReport = async (month = reportMonth, year = reportYear) => {
+    setLoadingReport(true);
+    try {
+      const response = await axios.get(
+        `${API}/reports/monthly-commission?month=${month}&year=${year}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 8000,
+        }
+      );
+      setMonthlyReport(response.data);
+    } catch (error) {
+      console.error('Erro ao carregar relatório mensal:', error.message);
+      setMonthlyReport(null);
+      toast.error(error.response?.data?.detail || 'Falha ao gerar relatório mensal');
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       await fetchUsers();
+      await fetchMonthlyReport();
       setLoading(false);
     };
     loadData();
@@ -411,6 +437,101 @@ function AdminDashboard({ user, token, onLogout }) {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-xl">
+            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Relatório Mensal de Comissão</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Regras: menos ocorrência = 1.0%, meio = 0.9%, mais ocorrência = 0.8%
+                </p>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1">
+                  <Label>Mês</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={reportMonth}
+                    onChange={(e) => setReportMonth(e.target.value)}
+                    className="w-24"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Ano</Label>
+                  <Input
+                    type="number"
+                    min="2020"
+                    max="2100"
+                    value={reportYear}
+                    onChange={(e) => setReportYear(e.target.value)}
+                    className="w-28"
+                  />
+                </div>
+                <Button
+                  onClick={() => fetchMonthlyReport(reportMonth, reportYear)}
+                  disabled={loadingReport}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {loadingReport ? 'Gerando...' : 'Gerar Relatório'}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {monthlyReport ? (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="rounded-lg border p-3 bg-white/80">
+                      <p className="text-xs text-muted-foreground">Período</p>
+                      <p className="font-semibold">{monthlyReport.month}/{monthlyReport.year}</p>
+                    </div>
+                    <div className="rounded-lg border p-3 bg-white/80">
+                      <p className="text-xs text-muted-foreground">Status</p>
+                      <p className="font-semibold capitalize">{monthlyReport.status === 'closed' ? 'Fechado' : 'Provisório'}</p>
+                    </div>
+                    <div className="rounded-lg border p-3 bg-white/80">
+                      <p className="text-xs text-muted-foreground">Total Entregue</p>
+                      <p className="font-semibold">R$ {monthlyReport.summary?.total_delivered_value?.toFixed(2) || '0.00'}</p>
+                    </div>
+                    <div className="rounded-lg border p-3 bg-white/80">
+                      <p className="text-xs text-muted-foreground">Total Comissão</p>
+                      <p className="font-semibold">R$ {monthlyReport.summary?.total_commission_value?.toFixed(2) || '0.00'}</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-3">Funcionário</th>
+                          <th className="text-left py-2 px-3">Função</th>
+                          <th className="text-center py-2 px-3">Ocorrências</th>
+                          <th className="text-right py-2 px-3">Valor Entregue</th>
+                          <th className="text-right py-2 px-3">%</th>
+                          <th className="text-right py-2 px-3">Comissão</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {monthlyReport.rows?.map((row) => (
+                          <tr key={row.employee_id} className="border-b hover:bg-muted/40">
+                            <td className="py-2 px-3 font-medium">{row.employee_name}</td>
+                            <td className="py-2 px-3 capitalize">{row.role}</td>
+                            <td className="py-2 px-3 text-center">{row.occurrence_count}</td>
+                            <td className="py-2 px-3 text-right">R$ {row.monthly_delivered_value.toFixed(2)}</td>
+                            <td className="py-2 px-3 text-right">{row.percentage.toFixed(2)}%</td>
+                            <td className="py-2 px-3 text-right font-semibold text-green-700">R$ {row.commission_value.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sem dados de relatório para o período informado.</p>
+              )}
             </CardContent>
           </Card>
         </div>
