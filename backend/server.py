@@ -219,16 +219,16 @@ def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], emp
     - Menos ocorrências: 1.0%
     - Se todos tiverem 0 ocorrências: 1.0% para todos
 
-    Regras especiais Valdiney:
-    - Faixa entre 2.0% e 2.5%
-    - Pior cenário: 2.0%
-    - Médio: 2.25%
-    - Melhor cenário: 2.5%
+    Regra especial Valdiney:
+    - Fixo em 2.5%
     """
     is_valdiney = is_special_member(employee_name)
-    min_rate = 2.0 if is_valdiney else 0.8
-    mid_rate = 2.25 if is_valdiney else 0.9
-    max_rate = 2.5 if is_valdiney else 1.0
+    if is_valdiney:
+        return 2.5
+
+    min_rate = 0.8
+    mid_rate = 0.9
+    max_rate = 1.0
 
     if not occurrence_counts:
         return max_rate
