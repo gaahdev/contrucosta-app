@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -26,6 +26,7 @@ const TRUCK_RATES = {
 
 function AdminDashboard({ user, token, onLogout }) {
   const now = new Date();
+  const reportSectionRef = useRef(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -87,6 +88,10 @@ function AdminDashboard({ user, token, onLogout }) {
       setMonthlyReport(response.data);
       setLastReportAt(new Date().toLocaleString('pt-BR'));
       toast.success('Relatório gerado com sucesso.');
+      // Leva o usuário direto para a seção do relatório após gerar.
+      setTimeout(() => {
+        reportSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
     } catch (error) {
       console.error('Erro ao carregar relatório mensal:', error.message);
       setMonthlyReport(null);
@@ -96,6 +101,61 @@ function AdminDashboard({ user, token, onLogout }) {
     } finally {
       setLoadingReport(false);
     }
+  };
+
+  const escapeCsv = (value) => {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    if (text.includes('"') || text.includes(',') || text.includes('\n')) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  };
+
+  const downloadMonthlyReportCsv = () => {
+    if (!monthlyReport?.rows?.length) {
+      toast.error('Não há dados de relatório para exportar.');
+      return;
+    }
+
+    const header = [
+      'employee_id',
+      'employee_name',
+      'role',
+      'occurrence_count',
+      'monthly_delivered_value',
+      'percentage',
+      'commission_value',
+    ];
+
+    const rows = monthlyReport.rows.map((row) => [
+      row.employee_id,
+      row.employee_name,
+      row.role,
+      row.occurrence_count,
+      row.monthly_delivered_value,
+      row.percentage,
+      row.commission_value,
+    ]);
+
+    const csvContent = [header, ...rows]
+      .map((line) => line.map(escapeCsv).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const month = String(monthlyReport.month).padStart(2, '0');
+    const fileName = `relatorio-comissao-${monthlyReport.year}-${month}.csv`;
+
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success('CSV exportado com sucesso.');
   };
 
   useEffect(() => {
@@ -261,8 +321,18 @@ function AdminDashboard({ user, token, onLogout }) {
             </Card>
           </div>
 
+          <div className="flex justify-end">
+            <Button
+              onClick={() => reportSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="bg-indigo-600 hover:bg-indigo-700"
+              disabled={!monthlyReport}
+            >
+              Ir para Relatório
+            </Button>
+          </div>
+
           {/* Users Table */}
-          <Card className="shadow-xl">
+          <Card className="shadow-xl" ref={reportSectionRef}>
             <CardHeader>
               <CardTitle className="text-xl" style={{ fontFamily: 'Space Grotesk' }}>Users & Commissions</CardTitle>
             </CardHeader>
@@ -499,6 +569,13 @@ function AdminDashboard({ user, token, onLogout }) {
                   className="bg-blue-600 hover:bg-blue-700"
                 >
                   {loadingReport ? 'Gerando relatório...' : 'Gerar Relatório'}
+                </Button>
+                <Button
+                  onClick={downloadMonthlyReportCsv}
+                  disabled={!monthlyReport?.rows?.length || loadingReport}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Baixar CSV
                 </Button>
               </div>
             </CardHeader>
