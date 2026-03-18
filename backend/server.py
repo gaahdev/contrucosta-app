@@ -326,17 +326,31 @@ def get_monthly_percentage(
     year: int,
 ) -> float:
     """
-    Regra mensal solicitada:
-    - Durante o mês: todos (exceto Valdiney) ficam em 0.8%
-    - Fechamento do mês: ranking por ocorrências (mais=0.8, meio=0.9, menos=1.0)
-    - Valdiney mantém regra especial já existente
+    Regra provisória para a tela Users & Commissions:
+    - Todos ficam em 0.8%
+    - Exceção Valdiney: regra especial já existente
+
+    Observação:
+    - O fechamento final por ranking (0.8/0.9/1.0) é aplicado apenas no relatório mensal.
     """
     if is_special_member(employee_name):
         return get_tier_percentage(employee_id, occurrence_counts, employee_name)
 
-    if not is_month_closed(month, year):
-        return 0.8
+    return 0.8
 
+
+def get_final_monthly_percentage(
+    employee_id: str,
+    employee_name: Optional[str],
+    occurrence_counts: Dict[str, int],
+) -> float:
+    """
+    Percentual final de fechamento mensal:
+    - Mais ocorrências: 0.8%
+    - Meio: 0.9%
+    - Menos ocorrências: 1.0%
+    - Exceção Valdiney: regra especial (2.5% fixo)
+    """
     return get_tier_percentage(employee_id, occurrence_counts, employee_name)
 
 
@@ -713,6 +727,9 @@ async def get_monthly_commission_report(
         percentage = get_monthly_percentage(user_id, name, occurrence_counts, month, year)
         commission_value = month_delivered * (percentage / 100)
 
+        final_percentage = get_final_monthly_percentage(user_id, name, occurrence_counts)
+        final_commission_value = month_delivered * (final_percentage / 100)
+
         report_rows.append({
             "employee_id": user_id,
             "employee_name": name,
@@ -721,12 +738,15 @@ async def get_monthly_commission_report(
             "monthly_delivered_value": round(month_delivered, 2),
             "percentage": round(percentage, 2),
             "commission_value": round(commission_value, 2),
+            "final_percentage": round(final_percentage, 2),
+            "final_commission_value": round(final_commission_value, 2),
         })
 
     report_rows.sort(key=lambda row: (row["occurrence_count"], -row["monthly_delivered_value"]))
 
     total_delivered = round(sum(row["monthly_delivered_value"] for row in report_rows), 2)
     total_commission = round(sum(row["commission_value"] for row in report_rows), 2)
+    total_final_commission = round(sum(row["final_commission_value"] for row in report_rows), 2)
 
     return {
         "month": month,
@@ -745,6 +765,7 @@ async def get_monthly_commission_report(
             "employees": len(report_rows),
             "total_delivered_value": total_delivered,
             "total_commission_value": total_commission,
+            "total_final_commission_value": total_final_commission,
         },
         "rows": report_rows,
     }

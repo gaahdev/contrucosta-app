@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from 'sonner';
 import { LogOut, Users, DollarSign } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 const API = `${BACKEND_URL}/api`;
@@ -39,6 +41,7 @@ function AdminDashboard({ user, token, onLogout }) {
   const [reportYear, setReportYear] = useState(String(now.getFullYear()));
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportError, setReportError] = useState('');
   const [lastReportAt, setLastReportAt] = useState('');
 
@@ -88,6 +91,7 @@ function AdminDashboard({ user, token, onLogout }) {
       setMonthlyReport(response.data);
       setLastReportAt(new Date().toLocaleString('pt-BR'));
       toast.success('Relatório gerado com sucesso.');
+      setReportDialogOpen(true);
       // Leva o usuário direto para a seção do relatório após gerar.
       setTimeout(() => {
         reportSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -103,59 +107,67 @@ function AdminDashboard({ user, token, onLogout }) {
     }
   };
 
-  const escapeCsv = (value) => {
-    if (value === null || value === undefined) return '';
-    const text = String(value);
-    if (text.includes('"') || text.includes(',') || text.includes('\n')) {
-      return `"${text.replace(/"/g, '""')}"`;
-    }
-    return text;
-  };
-
-  const downloadMonthlyReportCsv = () => {
+  const downloadMonthlyReportPdf = () => {
     if (!monthlyReport?.rows?.length) {
-      toast.error('Não há dados de relatório para exportar.');
+      toast.error('Não há dados de relatório para exportar em PDF.');
       return;
     }
 
-    const header = [
-      'employee_id',
-      'employee_name',
-      'role',
-      'occurrence_count',
-      'monthly_delivered_value',
-      'percentage',
-      'commission_value',
-    ];
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const month = String(monthlyReport.month).padStart(2, '0');
+    const title = `Relatório Final de Comissão - ${month}/${monthlyReport.year}`;
 
-    const rows = monthlyReport.rows.map((row) => [
-      row.employee_id,
+    doc.setFontSize(14);
+    doc.text(title, 40, 36);
+    doc.setFontSize(10);
+    doc.text('Regras finais: mais ocorrência = 0.8%, meio = 0.9%, menos = 1.0%, exceção Valdiney.', 40, 54);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 40, 70);
+
+    const bodyRows = monthlyReport.rows.map((row) => [
       row.employee_name,
       row.role,
-      row.occurrence_count,
-      row.monthly_delivered_value,
-      row.percentage,
-      row.commission_value,
+      String(row.occurrence_count),
+      `R$ ${Number(row.monthly_delivered_value || 0).toFixed(2)}`,
+      `${Number(row.final_percentage ?? row.percentage ?? 0).toFixed(2)}%`,
+      `R$ ${Number(row.final_commission_value ?? row.commission_value ?? 0).toFixed(2)}`,
     ]);
 
-    const csvContent = [header, ...rows]
-      .map((line) => line.map(escapeCsv).join(','))
-      .join('\n');
+    autoTable(doc, {
+      startY: 86,
+      head: [[
+        'Funcionário',
+        'Função',
+        'Ocorrências',
+        'Valor Entregue',
+        'Percentual Final',
+        'Comissão Final',
+      ]],
+      body: bodyRows,
+      theme: 'striped',
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [39, 63, 97] },
+      columnStyles: {
+        2: { halign: 'center' },
+        3: { halign: 'right' },
+        4: { halign: 'right' },
+        5: { halign: 'right' },
+      },
+      margin: { left: 40, right: 40 },
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const month = String(monthlyReport.month).padStart(2, '0');
-    const fileName = `relatorio-comissao-${monthlyReport.year}-${month}.csv`;
+    const finalY = doc.lastAutoTable?.finalY || 86;
+    const totalDelivered = Number(monthlyReport.summary?.total_delivered_value || 0).toFixed(2);
+    const totalFinalCommission = Number(
+      monthlyReport.summary?.total_final_commission_value ?? monthlyReport.summary?.total_commission_value ?? 0
+    ).toFixed(2);
 
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    doc.setFontSize(10);
+    doc.text(`Total Entregue: R$ ${totalDelivered}`, 40, finalY + 22);
+    doc.text(`Total Comissão Final: R$ ${totalFinalCommission}`, 40, finalY + 38);
 
-    toast.success('CSV exportado com sucesso.');
+    const fileName = `relatorio-final-comissao-${monthlyReport.year}-${month}.pdf`;
+    doc.save(fileName);
+    toast.success('PDF exportado com sucesso.');
   };
 
   useEffect(() => {
@@ -322,13 +334,82 @@ function AdminDashboard({ user, token, onLogout }) {
           </div>
 
           <div className="flex justify-end">
-            <Button
-              onClick={() => reportSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="bg-indigo-600 hover:bg-indigo-700"
-              disabled={!monthlyReport}
-            >
-              Ir para Relatório
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => reportSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="bg-indigo-600 hover:bg-indigo-700"
+                disabled={!monthlyReport}
+              >
+                Ir para Relatório
+              </Button>
+
+              <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="bg-slate-700 hover:bg-slate-800"
+                    disabled={!monthlyReport}
+                  >
+                    Ver Relatório
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Relatório Mensal de Comissão</DialogTitle>
+                    <DialogDescription>
+                      {monthlyReport ? `${monthlyReport.month}/${monthlyReport.year} - ${monthlyReport.status === 'closed' ? 'Fechado' : 'Provisório'}` : 'Sem dados'}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {monthlyReport ? (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="rounded border p-3">
+                          <p className="text-xs text-muted-foreground">Funcionários</p>
+                          <p className="font-semibold">{monthlyReport.summary?.employees || 0}</p>
+                        </div>
+                        <div className="rounded border p-3">
+                          <p className="text-xs text-muted-foreground">Total Entregue</p>
+                          <p className="font-semibold">R$ {monthlyReport.summary?.total_delivered_value?.toFixed(2) || '0.00'}</p>
+                        </div>
+                        <div className="rounded border p-3">
+                          <p className="text-xs text-muted-foreground">Total Comissão</p>
+                          <p className="font-semibold">R$ {(monthlyReport.summary?.total_final_commission_value ?? monthlyReport.summary?.total_commission_value ?? 0).toFixed(2)}</p>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto border rounded">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b bg-muted/40">
+                              <th className="text-left py-2 px-3">Funcionário</th>
+                              <th className="text-left py-2 px-3">Função</th>
+                              <th className="text-center py-2 px-3">Ocorrências</th>
+                              <th className="text-right py-2 px-3">Valor Entregue</th>
+                              <th className="text-right py-2 px-3">%</th>
+                              <th className="text-right py-2 px-3">Comissão</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {monthlyReport.rows?.map((row) => (
+                              <tr key={`dialog-${row.employee_id}`} className="border-b">
+                                <td className="py-2 px-3 font-medium">{row.employee_name}</td>
+                                <td className="py-2 px-3 capitalize">{row.role}</td>
+                                <td className="py-2 px-3 text-center">{row.occurrence_count}</td>
+                                <td className="py-2 px-3 text-right">R$ {row.monthly_delivered_value.toFixed(2)}</td>
+                                <td className="py-2 px-3 text-right">{Number(row.final_percentage ?? row.percentage ?? 0).toFixed(2)}%</td>
+                                <td className="py-2 px-3 text-right font-semibold text-green-700">R$ {Number(row.final_commission_value ?? row.commission_value ?? 0).toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sem dados de relatório.</p>
+                  )}
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
 
           {/* Users Table */}
@@ -571,11 +652,11 @@ function AdminDashboard({ user, token, onLogout }) {
                   {loadingReport ? 'Gerando relatório...' : 'Gerar Relatório'}
                 </Button>
                 <Button
-                  onClick={downloadMonthlyReportCsv}
+                  onClick={downloadMonthlyReportPdf}
                   disabled={!monthlyReport?.rows?.length || loadingReport}
                   className="bg-emerald-600 hover:bg-emerald-700"
                 >
-                  Baixar CSV
+                  Baixar PDF
                 </Button>
               </div>
             </CardHeader>
@@ -609,7 +690,7 @@ function AdminDashboard({ user, token, onLogout }) {
                     </div>
                     <div className="rounded-lg border p-3 bg-white/80">
                       <p className="text-xs text-muted-foreground">Total Comissão</p>
-                      <p className="font-semibold">R$ {monthlyReport.summary?.total_commission_value?.toFixed(2) || '0.00'}</p>
+                      <p className="font-semibold">R$ {(monthlyReport.summary?.total_final_commission_value ?? monthlyReport.summary?.total_commission_value ?? 0).toFixed(2)}</p>
                     </div>
                   </div>
 
@@ -632,8 +713,8 @@ function AdminDashboard({ user, token, onLogout }) {
                             <td className="py-2 px-3 capitalize">{row.role}</td>
                             <td className="py-2 px-3 text-center">{row.occurrence_count}</td>
                             <td className="py-2 px-3 text-right">R$ {row.monthly_delivered_value.toFixed(2)}</td>
-                            <td className="py-2 px-3 text-right">{row.percentage.toFixed(2)}%</td>
-                            <td className="py-2 px-3 text-right font-semibold text-green-700">R$ {row.commission_value.toFixed(2)}</td>
+                            <td className="py-2 px-3 text-right">{Number(row.final_percentage ?? row.percentage ?? 0).toFixed(2)}%</td>
+                            <td className="py-2 px-3 text-right font-semibold text-green-700">R$ {Number(row.final_commission_value ?? row.commission_value ?? 0).toFixed(2)}</td>
                           </tr>
                         ))}
                       </tbody>
