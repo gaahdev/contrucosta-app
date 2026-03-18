@@ -38,6 +38,8 @@ function AdminDashboard({ user, token, onLogout }) {
   const [reportYear, setReportYear] = useState(String(now.getFullYear()));
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [loadingReport, setLoadingReport] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [lastReportAt, setLastReportAt] = useState('');
 
   const navigate = useNavigate();
 
@@ -57,20 +59,40 @@ function AdminDashboard({ user, token, onLogout }) {
   };
 
   const fetchMonthlyReport = async (month = reportMonth, year = reportYear) => {
+    const parsedMonth = Number(month);
+    const parsedYear = Number(year);
+
+    if (!Number.isInteger(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+      setReportError('Informe um mês válido (1 a 12).');
+      toast.error('Mês inválido. Use valores entre 1 e 12.');
+      return;
+    }
+
+    if (!Number.isInteger(parsedYear) || parsedYear < 2020 || parsedYear > 2100) {
+      setReportError('Informe um ano válido (2020 a 2100).');
+      toast.error('Ano inválido.');
+      return;
+    }
+
     setLoadingReport(true);
+    setReportError('');
     try {
       const response = await axios.get(
-        `${API}/reports/monthly-commission?month=${month}&year=${year}`,
+        `${API}/reports/monthly-commission?month=${parsedMonth}&year=${parsedYear}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 8000,
+          timeout: 30000,
         }
       );
       setMonthlyReport(response.data);
+      setLastReportAt(new Date().toLocaleString('pt-BR'));
+      toast.success('Relatório gerado com sucesso.');
     } catch (error) {
       console.error('Erro ao carregar relatório mensal:', error.message);
       setMonthlyReport(null);
-      toast.error(error.response?.data?.detail || 'Falha ao gerar relatório mensal');
+      const detail = error.response?.data?.detail || 'Falha ao gerar relatório mensal';
+      setReportError(typeof detail === 'string' ? detail : 'Falha ao gerar relatório mensal');
+      toast.error(typeof detail === 'string' ? detail : 'Falha ao gerar relatório mensal');
     } finally {
       setLoadingReport(false);
     }
@@ -476,11 +498,23 @@ function AdminDashboard({ user, token, onLogout }) {
                   disabled={loadingReport}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {loadingReport ? 'Gerando...' : 'Gerar Relatório'}
+                  {loadingReport ? 'Gerando relatório...' : 'Gerar Relatório'}
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {loadingReport && (
+                <p className="text-sm text-blue-700 mb-3">Consultando dados e montando relatório mensal...</p>
+              )}
+
+              {!loadingReport && reportError && (
+                <p className="text-sm text-red-600 mb-3">Erro ao gerar relatório: {reportError}</p>
+              )}
+
+              {!loadingReport && lastReportAt && (
+                <p className="text-xs text-muted-foreground mb-3">Última atualização: {lastReportAt}</p>
+              )}
+
               {monthlyReport ? (
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
