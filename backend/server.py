@@ -233,49 +233,22 @@ def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], emp
     if not occurrence_counts:
         return max_rate
 
-    if all(count == 0 for count in occurrence_counts.values()):
-        return max_rate
+    employee_count = occurrence_counts.get(employee_id, 0)
+    all_counts = list(occurrence_counts.values())
+    max_count = max(all_counts)
+    min_count = min(all_counts)
 
-    members_with_occurrence = [
-        (emp_id, count) for emp_id, count in occurrence_counts.items() if count > 0
-    ]
-    members_with_occurrence.sort(key=lambda item: item[1], reverse=True)
+    # Sem diferenciação real: todos sem ocorrência => melhor taxa;
+    # todos com mesmo número > 0 => taxa média.
+    if max_count == min_count:
+        return max_rate if max_count == 0 else mid_rate
 
-    # Regra específica: apenas 1 membro com ocorrência -> só ele recebe a menor taxa
-    if len(members_with_occurrence) == 1:
-        return min_rate if employee_id == members_with_occurrence[0][0] else max_rate
-
-    # Regra específica: 2 membros com ocorrência -> maior recebe menor taxa, menor recebe taxa média, restante taxa máxima
-    if len(members_with_occurrence) == 2:
-        first_id = members_with_occurrence[0][0]
-        second_id = members_with_occurrence[1][0]
-        first_count = members_with_occurrence[0][1]
-        second_count = members_with_occurrence[1][1]
-        if first_count == second_count and employee_id in {first_id, second_id}:
-            return mid_rate
-        if employee_id == first_id:
-            return min_rate
-        if employee_id == second_id:
-            return mid_rate
-        return max_rate
-
-    sorted_employees = sorted(
-        occurrence_counts.items(),
-        key=lambda item: item[1],
-        reverse=True
-    )
-
-    positions = {emp_id: idx for idx, (emp_id, _) in enumerate(sorted_employees)}
-    position = positions.get(employee_id, len(sorted_employees) - 1)
-
-    total = len(sorted_employees)
-    tier_size = total / 3
-
-    if position < tier_size:
+    # Com empates, quem tem mesma quantidade recebe o mesmo tier.
+    if employee_count == max_count:
         return min_rate
-    if position < tier_size * 2:
-        return mid_rate
-    return max_rate
+    if employee_count == min_count:
+        return max_rate
+    return mid_rate
 
 async def get_occurrence_count_map() -> Dict[str, int]:
     """Retorna mapa employee_id -> quantidade de ocorrências para todos os membros."""
