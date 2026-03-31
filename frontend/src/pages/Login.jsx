@@ -98,10 +98,6 @@ function Login({ onLogin }) {
               Register here
             </Link>
           </div>
-          <div className="mt-4 p-3 bg-muted rounded-lg text-xs text-center">
-            <p className="font-semibold mb-1">Demo Admin Login:</p>
-            <p>Username: <span className="font-mono">....</span> | Password: <span className="font-mono">....</span></p>
-          </div>
         </CardContent>
       </Card>
     </div>
