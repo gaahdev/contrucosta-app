@@ -224,7 +224,7 @@ def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], emp
     """
     is_valdiney = is_special_member(employee_name)
     if is_valdiney:
-        return 2.5
+        return 1.3
 
     min_rate = 0.8
     mid_rate = 0.9
