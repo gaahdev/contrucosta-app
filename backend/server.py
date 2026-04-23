@@ -300,7 +300,7 @@ def get_monthly_percentage(
 ) -> float:
     """
     Regra provisória para a tela Users & Commissions:
-    - Todos ficam em 0.8%
+    - Todos ficam em 0.4%
     - Exceção Valdiney: regra especial já existente
 
     Observação:
@@ -309,7 +309,7 @@ def get_monthly_percentage(
     if is_special_member(employee_name):
         return get_tier_percentage(employee_id, occurrence_counts, employee_name)
 
-    return 0.8
+    return 0.4
 
 
 def get_final_monthly_percentage(
