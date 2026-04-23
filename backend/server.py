@@ -214,9 +214,9 @@ def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], emp
     """Calcula percentual por tier de ocorrências.
 
     Regras padrão:
-    - Mais ocorrências: 0.8%
-    - Ocorrências medianas: 0.9%
-    - Menos ocorrências: 1.0%
+    - Mais ocorrências: 0.4%
+    - Ocorrências medianas: 0.5%
+    - Menos ocorrências: 0.6%
     - Se todos tiverem 0 ocorrências: 1.0% para todos
 
     Regra especial Valdiney:
@@ -226,9 +226,9 @@ def get_tier_percentage(employee_id: str, occurrence_counts: Dict[str, int], emp
     if is_valdiney:
         return 1.3
 
-    min_rate = 0.8
-    mid_rate = 0.9
-    max_rate = 1.0
+    min_rate = 0.4
+    mid_rate = 0.5
+    max_rate = 0.6
 
     if not occurrence_counts:
         return max_rate
